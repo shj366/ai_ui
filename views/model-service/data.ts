@@ -16,7 +16,7 @@ export const PROVIDER_TYPE_OPTIONS = [
   { label: 'Google', value: 2 },
   { label: 'xAI', value: 3 },
   { label: 'OpenRouter', value: 4 },
-  { label: 'Type 5', value: 5 },
+  { label: 'OpenAI Responses', value: 5 },
 ];
 
 export function buildProviderNameMap(providers: AIProviderResult[]) {
