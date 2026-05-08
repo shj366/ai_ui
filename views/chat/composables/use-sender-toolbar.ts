@@ -8,19 +8,19 @@ import type {
   AIQuickPhraseResult,
 } from '#/plugins/ai/api';
 
-import { h, ref } from 'vue';
+import { h, ref, resolveComponent } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 
-import {
-  Button as AButton,
-  Empty as AEmpty,
-  Flex as AFlex,
-  Spin as ASpin,
-} from 'antdv-next';
-import { Popover } from 'antdv-next';
-
 import { getAllAIQuickPhraseApi } from '#/plugins/ai/api';
+
+interface SenderToolbarOption {
+  desc?: string;
+  icon?: string;
+  key: string;
+  label: string;
+  title?: string;
+}
 
 export interface UseSenderToolbarOptions {
   activeConversationId: Ref<string>;
@@ -60,6 +60,14 @@ export interface UseSenderToolbarOptions {
 }
 
 export function useSenderToolbar(options: UseSenderToolbarOptions) {
+  const aButton = resolveComponent('a-button');
+  const aEmpty = resolveComponent('a-empty');
+  const aFlex = resolveComponent('a-flex');
+  const aPopover = resolveComponent('a-popover');
+  const aSpin = resolveComponent('a-spin');
+  const aTypographyText = resolveComponent('a-typography-text');
+  const optionCardRadiusClass = '!rounded-[var(--radius)]';
+
   const {
     canClearMessages,
     canCreateNewConversation,
@@ -120,11 +128,9 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
   }
 
   function toggleMcpSelection(mcpId: number) {
-    if (isMcpSelected(mcpId)) {
-      selectedMcpIds.value = selectedMcpIds.value.filter((id) => id !== mcpId);
-      return;
-    }
-    selectedMcpIds.value = [...selectedMcpIds.value, mcpId];
+    selectedMcpIds.value = isMcpSelected(mcpId)
+      ? selectedMcpIds.value.filter((id) => id !== mcpId)
+      : [...selectedMcpIds.value, mcpId];
   }
 
   function renderFooterIconButton(opts: {
@@ -133,331 +139,282 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
     onClick?: () => void;
     title: string;
   }) {
-    return h(AButton, {
-      class: 'inline-flex size-8 items-center justify-center !px-0',
+    return h(aButton, {
       disabled: opts.disabled,
       htmlType: 'button',
       icon: h(IconifyIcon, {
-        class: 'size-4',
         icon: opts.icon,
       }),
       onClick: () => {
         opts.onClick?.();
       },
+      shape: 'circle',
       size: 'small',
       title: opts.title,
       type: 'text',
     });
   }
 
-  function renderThinkingPopoverContent() {
-    return h('div', { class: 'w-[320px] space-y-3' }, [
-      h('div', { class: 'text-xs font-medium text-foreground' }, '思考链'),
-      h(
-        'div',
-        { class: 'space-y-2' },
-        THINKING_OPTIONS.map((item) =>
+  function renderPopoverContent(content: ReturnType<typeof h>, width: number) {
+    return h(
+      aFlex,
+      {
+        gap: 'small',
+        style: { width: `${width}px` },
+        vertical: true,
+      },
+      {
+        default: () => [content],
+      },
+    );
+  }
+
+  function renderOptionLabel(item: { desc?: string; label: string }) {
+    return h(
+      aFlex,
+      {
+        gap: 2,
+        style: { flex: 1, minWidth: 0 },
+        vertical: true,
+      },
+      {
+        default: () => [
           h(
-            'button',
+            aTypographyText,
             {
-              key: item.key,
-              class: [
-                'flex w-full items-start gap-3 rounded-xl border px-3 py-2 text-left transition-colors',
-                thinking.value === item.value
-                  ? 'border-primary/35 bg-primary/10'
-                  : 'border-border bg-background hover:border-primary/30 hover:bg-accent/30',
-              ],
-              onClick: () => {
-                thinking.value = item.value;
-              },
-              type: 'button',
+              class: 'block max-w-full',
+              ellipsis: { tooltip: item.label },
+              strong: true,
+              style: { fontSize: '12px', lineHeight: '16px' },
             },
-            [
-              h(
-                'span',
-                {
-                  class: [
-                    'mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded border text-[10px]',
-                    thinking.value === item.value
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border bg-background text-transparent',
-                  ],
-                },
-                '✓',
-              ),
-              h('span', { class: 'min-w-0 flex-1' }, [
-                h(
-                  'span',
-                  { class: 'block text-xs font-medium text-foreground' },
-                  item.label,
-                ),
-                h(
-                  'span',
-                  { class: 'mt-1 block text-[11px] text-muted-foreground/75' },
-                  item.desc,
-                ),
-              ]),
-            ],
+            { default: () => item.label },
           ),
-        ),
+          item.desc
+            ? h(
+                aTypographyText,
+                {
+                  class: 'block max-w-full',
+                  ellipsis: { tooltip: item.desc },
+                  style: {
+                    fontSize: '10px',
+                    lineHeight: '14px',
+                    maxWidth: '100%',
+                  },
+                  type: 'secondary',
+                },
+                { default: () => item.desc },
+              )
+            : null,
+        ],
+      },
+    );
+  }
+
+  function renderOptionCard(
+    params: SenderToolbarOption & {
+      onClick: () => void;
+      selected?: boolean;
+    },
+  ) {
+    const icon =
+      params.selected === undefined
+        ? params.icon
+        : (params.selected
+          ? 'mdi:check-circle'
+          : (params.icon ?? 'mdi:circle-outline'));
+
+    return h(
+      aButton,
+      {
+        block: true,
+        class: [
+          '!flex !h-auto !items-start !justify-start !px-2.5 !py-1.5 !text-left !transition-colors',
+          optionCardRadiusClass,
+          params.selected
+            ? '!border-primary/40 !bg-primary/10 !text-foreground shadow-sm'
+            : '!border-border !bg-background hover:!border-primary/30 hover:!bg-accent/30',
+        ],
+        htmlType: 'button',
+        key: params.key,
+        onClick: params.onClick,
+        title: params.title ?? `${params.label} ${params.desc ?? ''}`.trim(),
+        type: 'default',
+      },
+      {
+        default: () =>
+          h(
+            aFlex,
+            { align: 'flex-start', gap: 'small', style: { width: '100%' } },
+            {
+              default: () => [
+                icon
+                  ? h(IconifyIcon, {
+                      class: [
+                        'mt-0.5 size-3.5 shrink-0',
+                        params.selected
+                          ? 'text-primary'
+                          : 'text-muted-foreground/60',
+                      ],
+                      icon,
+                    })
+                  : null,
+                renderOptionLabel(params),
+              ],
+            },
+          ),
+      },
+    );
+  }
+
+  function renderOptionList(
+    items: Array<
+      SenderToolbarOption & {
+        onClick: () => void;
+        selected?: boolean;
+      }
+    >,
+    maxHeight?: number | string,
+  ) {
+    return h(
+      aFlex,
+      {
+        gap: 'small',
+        style: maxHeight
+          ? {
+              maxHeight:
+                typeof maxHeight === 'number' ? `${maxHeight}px` : maxHeight,
+              overflowX: 'hidden',
+              overflowY: 'auto',
+              paddingRight: '2px',
+            }
+          : undefined,
+        vertical: true,
+      },
+      {
+        default: () => items.map((item) => renderOptionCard(item)),
+      },
+    );
+  }
+
+  function renderSelectableOptionsContent(params: {
+    activeKey?: string;
+    items: SenderToolbarOption[];
+    onSelect: (key: string) => void;
+    width?: number;
+  }) {
+    return renderPopoverContent(
+      renderOptionList(
+        params.items.map((item) => ({
+          ...item,
+          onClick: () => {
+            params.onSelect(item.key);
+          },
+          selected: item.key === params.activeKey,
+        })),
       ),
-    ]);
+      params.width ?? 320,
+    );
+  }
+
+  function renderThinkingPopoverContent() {
+    const activeOption = THINKING_OPTIONS.find(
+      (item) => item.value === thinking.value,
+    );
+    return renderSelectableOptionsContent({
+      activeKey: activeOption?.key,
+      items: THINKING_OPTIONS.map((item) => ({
+        desc: item.desc,
+        key: item.key,
+        label: item.label,
+      })),
+      onSelect: (key) => {
+        thinking.value = THINKING_OPTIONS.find(
+          (item) => item.key === key,
+        )?.value;
+      },
+    });
   }
 
   function renderGenerationPopoverContent() {
-    return h('div', { class: 'w-[320px] space-y-3' }, [
-      h('div', { class: 'text-xs font-medium text-foreground' }, '生成类型'),
-      h(
-        'div',
-        { class: 'space-y-2' },
-        GENERATION_TYPE_OPTIONS.map((item) =>
-          h(
-            'button',
-            {
-              key: item.value,
-              class: [
-                'flex w-full items-start gap-3 rounded-xl border px-3 py-2 text-left transition-colors',
-                generationType.value === item.value
-                  ? 'border-primary/35 bg-primary/10'
-                  : 'border-border bg-background hover:border-primary/30 hover:bg-accent/30',
-              ],
-              onClick: () => {
-                generationType.value = item.value;
-              },
-              type: 'button',
-            },
-            [
-              h(
-                'span',
-                {
-                  class: [
-                    'mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded border text-[10px] leading-none',
-                    generationType.value === item.value
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border bg-background text-transparent',
-                  ],
-                },
-                '✓',
-              ),
-              h('span', { class: 'min-w-0 flex-1' }, [
-                h(
-                  'span',
-                  {
-                    class:
-                      'block truncate text-xs font-medium leading-4 text-foreground',
-                  },
-                  item.label,
-                ),
-                h(
-                  'span',
-                  {
-                    class:
-                      'mt-1 block truncate text-[11px] leading-4 text-muted-foreground/75',
-                  },
-                  item.desc,
-                ),
-              ]),
-            ],
-          ),
-        ),
-      ),
-    ]);
+    return renderSelectableOptionsContent({
+      activeKey: generationType.value,
+      items: GENERATION_TYPE_OPTIONS.map((item) => ({
+        desc: item.desc,
+        key: item.value,
+        label: item.label,
+      })),
+      onSelect: (key) => {
+        generationType.value = key;
+      },
+    });
   }
 
   function renderWebSearchPopoverContent() {
-    return h('div', { class: 'w-[320px] space-y-3' }, [
-      h('div', { class: 'text-xs font-medium text-foreground' }, '网络搜索'),
-      h(
-        'div',
-        { class: 'space-y-2' },
-        WEB_SEARCH_OPTIONS.map((item) =>
-          h(
-            'button',
-            {
-              key: item.value,
-              class: [
-                'flex w-full items-start gap-3 rounded-xl border px-3 py-2 text-left transition-colors',
-                webSearch.value === item.value
-                  ? 'border-primary/35 bg-primary/10'
-                  : 'border-border bg-background hover:border-primary/30 hover:bg-accent/30',
-              ],
-              onClick: () => {
-                webSearch.value = item.value;
-              },
-              type: 'button',
-            },
-            [
-              h(
-                'span',
-                {
-                  class: [
-                    'mt-0.5 inline-flex size-4 shrink-0 items-center justify-center rounded border text-[10px] leading-none',
-                    webSearch.value === item.value
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border bg-background text-transparent',
-                  ],
-                },
-                '✓',
-              ),
-              h('span', { class: 'min-w-0 flex-1' }, [
-                h(
-                  'span',
-                  {
-                    class:
-                      'block truncate text-xs font-medium leading-4 text-foreground',
-                  },
-                  item.label,
-                ),
-                h(
-                  'span',
-                  {
-                    class:
-                      'mt-1 block truncate text-[11px] leading-4 text-muted-foreground/75',
-                  },
-                  item.desc,
-                ),
-              ]),
-            ],
-          ),
-        ),
-      ),
-    ]);
+    return renderSelectableOptionsContent({
+      activeKey: webSearch.value,
+      items: WEB_SEARCH_OPTIONS.map((item) => ({
+        desc: item.desc,
+        key: item.value,
+        label: item.label,
+      })),
+      onSelect: (key) => {
+        webSearch.value = key;
+      },
+    });
+  }
+
+  function getMcpDescription(item: AIMcpResult) {
+    return item.description || item.command || item.url || `MCP #${item.id}`;
   }
 
   function renderMcpPopoverContent() {
-    return h('div', { class: 'w-[360px] space-y-3' }, [
-      h('div', { class: 'text-xs font-medium text-foreground' }, 'MCP'),
+    const content =
       mcps.value.length === 0
-        ? h(AEmpty, {
+        ? h(aEmpty, {
             description: '暂无可用 MCP',
             image: null,
           })
-        : h(
-            'div',
-            {
-              class:
-                'flex max-h-[260px] min-h-[120px] flex-col gap-2 overflow-y-auto',
-            },
-            mcps.value.map((item) =>
-              h(
-                'button',
-                {
-                  key: item.id,
-                  class: [
-                    'flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors',
-                    isMcpSelected(item.id)
-                      ? 'border-primary/30 bg-primary/8 text-foreground'
-                      : 'border-border bg-background hover:border-primary/20 hover:bg-accent/30',
-                  ],
-                  onClick: () => {
-                    toggleMcpSelection(item.id);
-                  },
-                  title:
-                    `${item.name} ${item.description || item.command || item.url || `MCP #${item.id}`}`.trim(),
-                  type: 'button',
-                },
-                [
-                  h(
-                    'span',
-                    {
-                      class:
-                        'min-w-0 shrink-0 truncate text-xs font-medium text-foreground',
-                    },
-                    item.name,
-                  ),
-                  h(
-                    'span',
-                    {
-                      class:
-                        'min-w-0 flex-1 truncate text-[11px] text-muted-foreground/75',
-                    },
-                    item.description ||
-                      item.command ||
-                      item.url ||
-                      `MCP #${item.id}`,
-                  ),
-                  h(
-                    'span',
-                    {
-                      class: [
-                        'inline-flex size-4 shrink-0 items-center justify-center rounded border text-[10px] leading-none',
-                        isMcpSelected(item.id)
-                          ? 'border-primary bg-primary text-primary-foreground'
-                          : 'border-border bg-background text-transparent',
-                      ],
-                    },
-                    '✓',
-                  ),
-                ],
-              ),
-            ),
-          ),
-    ]);
+        : renderOptionList(
+            mcps.value.map((item) => ({
+              desc: getMcpDescription(item),
+              key: String(item.id),
+              label: item.name,
+              onClick: () => {
+                toggleMcpSelection(item.id);
+              },
+              selected: isMcpSelected(item.id),
+            })),
+            'min(320px, 60vh)',
+          );
+
+    return renderPopoverContent(content, 320);
   }
 
   function renderQuickPhrasePopoverContent() {
     let quickPhraseContent;
     if (quickPhraseLoading.value) {
-      quickPhraseContent = h(
-        'div',
-        {
-          class:
-            'flex min-h-[120px] items-center justify-center text-muted-foreground',
-        },
-        [h(ASpin, { size: 'small' })],
-      );
+      quickPhraseContent = h(aSpin, { size: 'small' });
     } else if (quickPhrases.value.length === 0) {
-      quickPhraseContent = h(AEmpty, {
+      quickPhraseContent = h(aEmpty, {
         description: '暂无快捷短语',
         image: null,
       });
     } else {
-      quickPhraseContent = h(
-        'div',
-        {
-          class:
-            'flex max-h-[260px] min-h-[120px] flex-col gap-2 overflow-y-auto',
-        },
-        quickPhrases.value.map((item) =>
-          h(
-            'button',
-            {
-              key: item.id,
-              class:
-                'flex w-full items-center gap-3 rounded-lg border border-border bg-background px-3 py-2 text-left transition-colors hover:border-primary/20 hover:bg-accent/30',
-              onClick: () => {
-                handleQuickPhraseSelect(item);
-              },
-              title: `${item.title} ${item.content}`.trim(),
-              type: 'button',
-            },
-            [
-              h(
-                'span',
-                {
-                  class:
-                    'min-w-0 shrink-0 truncate text-xs font-medium text-foreground',
-                },
-                item.title,
-              ),
-              h(
-                'span',
-                {
-                  class:
-                    'min-w-0 flex-1 truncate text-[11px] text-muted-foreground/75',
-                },
-                item.content,
-              ),
-            ],
-          ),
-        ),
+      quickPhraseContent = renderOptionList(
+        quickPhrases.value.map((item) => ({
+          icon: 'mdi:lightning-bolt-outline',
+          key: String(item.id),
+          label: item.title,
+          title: `${item.title} ${item.content}`.trim(),
+          onClick: () => {
+            handleQuickPhraseSelect(item);
+          },
+        })),
+        'min(320px, 60vh)',
       );
     }
 
-    return h('div', { class: 'w-[360px] space-y-3' }, [
-      h('div', { class: 'text-xs font-medium text-foreground' }, '快捷短语'),
-      quickPhraseContent,
-    ]);
+    return renderPopoverContent(quickPhraseContent, 320);
   }
 
   const renderSenderFooter: NonNullable<SenderProps['footer']> = (_, info) => {
@@ -465,7 +422,7 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
     const thinkingButtonTitle = `思考：${thinkingButtonLabel.value}`;
 
     return h(
-      AFlex,
+      aFlex,
       {
         align: 'center',
         gap: 'small',
@@ -476,7 +433,7 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
       {
         default: () => [
           h(
-            AFlex,
+            aFlex,
             {
               align: 'center',
               gap: 'middle',
@@ -491,8 +448,8 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
                   title: '新建话题',
                 }),
                 h(
-                  Popover,
-                  { placement: 'topLeft', trigger: 'click' },
+                  aPopover,
+                  { placement: 'topLeft', title: '生成类型', trigger: 'click' },
                   {
                     content: () => renderGenerationPopoverContent(),
                     default: () =>
@@ -507,8 +464,8 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
                   },
                 ),
                 h(
-                  Popover,
-                  { placement: 'topLeft', trigger: 'click' },
+                  aPopover,
+                  { placement: 'topLeft', title: '思考链', trigger: 'click' },
                   {
                     content: () => renderThinkingPopoverContent(),
                     default: () =>
@@ -520,8 +477,8 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
                   },
                 ),
                 h(
-                  Popover,
-                  { placement: 'topLeft', trigger: 'click' },
+                  aPopover,
+                  { placement: 'topLeft', title: '联网搜索', trigger: 'click' },
                   {
                     content: () => renderWebSearchPopoverContent(),
                     default: () =>
@@ -533,10 +490,11 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
                   },
                 ),
                 h(
-                  Popover,
+                  aPopover,
                   {
                     align: { overflow: { adjustX: false, adjustY: true } },
                     placement: 'topLeft',
+                    title: '选择 MCP',
                     trigger: 'click',
                   },
                   {
@@ -553,12 +511,13 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
                   },
                 ),
                 h(
-                  Popover,
+                  aPopover,
                   {
                     align: { overflow: { adjustX: false, adjustY: true } },
                     onOpenChange: handleQuickPhrasePopoverOpenChange,
                     open: quickPhrasePopoverOpen.value,
                     placement: 'topLeft',
+                    title: '快捷短语',
                     trigger: 'click',
                   },
                   {
@@ -601,7 +560,7 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
             },
           ),
           h(
-            AFlex,
+            aFlex,
             {
               align: 'center',
               class: 'w-full md:w-auto',
@@ -626,8 +585,6 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
                       type: 'default',
                     })
                   : h(SendButton, {
-                      class:
-                        'inline-flex size-8 items-center justify-center !rounded-md !px-0',
                       disabled:
                         !selectedProviderId.value ||
                         !selectedModelId.value ||

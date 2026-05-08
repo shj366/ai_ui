@@ -38,7 +38,7 @@ import { usePreferences } from '@vben/preferences';
 
 import { BubbleList, Suggestion, Welcome } from '@antdv-next/x';
 import { useClipboard } from '@vueuse/core';
-import { Button as AButton, Spin as ASpin, message } from 'antdv-next';
+import { message } from 'antdv-next';
 
 import { useVbenForm } from '#/adapter/form';
 import {
@@ -1164,12 +1164,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <ColPage
-    auto-content-height
-    content-class="h-full"
-    :left-width="20"
-    :right-width="80"
-  >
+  <ColPage auto-content-height :left-width="20" :right-width="80">
     <template #left>
       <ChatSidebar
         :active-key="activeConversationId"
@@ -1204,7 +1199,7 @@ onBeforeUnmount(() => {
                 />
                 <a-popover placement="bottomLeft" trigger="click">
                   <template #content>
-                    <div class="w-[280px] space-y-3">
+                    <div class="w-[280px] space-y-3 text-popover-foreground">
                       <div>
                         <div class="mb-2 text-xs font-medium text-foreground">
                           供应商
@@ -1262,14 +1257,14 @@ onBeforeUnmount(() => {
       </div>
 
       <div
-        class="flex-1 overflow-x-hidden overflow-y-auto bg-background/60 px-5 py-5 md:px-6 md:py-6"
+        class="flex-1 overflow-x-hidden overflow-y-auto px-5 py-5 md:px-6 md:py-6"
         @scroll="handleMessageContainerScroll"
       >
         <div
           v-if="detailLoading"
           class="flex min-h-full items-center justify-center"
         >
-          <ASpin />
+          <a-spin />
         </div>
         <div
           v-else-if="displayMessages.length === 0"
@@ -1321,19 +1316,14 @@ onBeforeUnmount(() => {
       </Suggestion>
     </section>
 
-    <SettingsModal
-      content-class="h-full min-h-0 overflow-hidden p-0 [overscroll-behavior:contain]"
-      footer-class="border-t border-border px-4 py-4 md:px-5"
-      :show-cancel-button="false"
-      :show-confirm-button="false"
-    >
+    <SettingsModal :show-cancel-button="false" :show-confirm-button="false">
       <template #title>
         <span>参数设置</span>
       </template>
       <template #append-footer>
-        <AButton danger type="primary" @click="resetModelSettings">
+        <a-button danger type="primary" @click="resetModelSettings">
           重置
-        </AButton>
+        </a-button>
       </template>
       <ChatSettingsPanel
         v-model:enable-builtin-tools="enableBuiltinTools"
@@ -1352,7 +1342,7 @@ onBeforeUnmount(() => {
       />
     </SettingsModal>
 
-    <RenameConversationModal content-class="px-4 py-4 md:px-5 md:py-5">
+    <RenameConversationModal>
       <RenameConversationForm />
     </RenameConversationModal>
   </ColPage>

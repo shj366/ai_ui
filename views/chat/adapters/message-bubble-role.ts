@@ -15,7 +15,7 @@ import type {
   AIChatFileMessageBlock,
 } from '#/plugins/ai/types/message';
 
-import { h } from 'vue';
+import { h, resolveComponent } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 
@@ -28,7 +28,6 @@ import {
   Think,
 } from '@antdv-next/x';
 import { XMarkdown } from '@antdv-next/x-markdown';
-import { Avatar as AAvatar } from 'antdv-next';
 
 import {
   getMessageEventBlocks,
@@ -132,25 +131,6 @@ function getMessageDisplayName(
   return message.model_id || (selectedModelId ? selectedModelLabel : 'AI 助手');
 }
 
-function getMessageBubbleClasses(
-  message: ChatMessageItem,
-): BubbleProps['classes'] | undefined {
-  const baseClasses = {
-    body: 'min-w-0 max-w-full',
-    content: 'max-w-full overflow-hidden',
-    root: 'min-w-0 max-w-[calc(100%-16px)] md:max-w-[82%] xl:max-w-[76%]',
-  };
-
-  if (message.message_type !== 'error') {
-    return baseClasses;
-  }
-
-  return {
-    ...baseClasses,
-    content: `${baseClasses.content} !border !border-destructive/20 !bg-destructive/6 !text-destructive !shadow-none`,
-  };
-}
-
 function isMessageBubbleLoading(
   message: ChatMessageItem,
   _protocolDriver: AIChatProtocolDriver,
@@ -185,33 +165,9 @@ function formatJsonCodeBlock(content: string) {
 function renderCodeBlock(content: string, language = 'text', isDark = false) {
   return h('div', { class: 'min-w-0 w-full max-w-full overflow-hidden' }, [
     h(CodeHighlighter, {
-      class: 'min-w-0 w-full max-w-full',
-      classes: {
-        code: 'min-w-0 max-w-full',
-        content: 'min-w-0 max-w-full',
-        root: 'min-w-0 w-full max-w-full',
-      },
       content,
       language,
       showThemeToggle: false,
-      styles: {
-        code: {
-          flex: '1 1 0%',
-          maxWidth: '100%',
-          minWidth: 0,
-          overflowX: 'auto',
-        },
-        content: {
-          maxWidth: '100%',
-          minWidth: 0,
-          overflowX: 'auto',
-        },
-        root: {
-          maxWidth: '100%',
-          minWidth: 0,
-          width: '100%',
-        },
-      },
       theme: isDark ? 'dark' : 'light',
     }),
   ]);
@@ -281,10 +237,6 @@ function createMarkdownContentRenderer(isDark = false) {
     streaming?: boolean;
   }) {
     return h(XMarkdown, {
-      className: [
-        isDark ? 'x-markdown-dark' : 'x-markdown-light',
-        'min-w-0 max-w-full break-words',
-      ].join(' '),
       components: {
         [MARKDOWN_STREAM_FALLBACK_COMPONENT]: IncompleteMarkdownFragment,
         code: MarkdownCode,
@@ -517,7 +469,9 @@ function pushReferenceTerm(terms: Set<string>, value: unknown) {
   if (/^https?:\/\//iu.test(value.trim())) {
     try {
       const url = new URL(value.trim());
-      const hostTerm = normalizeReferenceText(url.hostname.replace(/^www\./iu, ''));
+      const hostTerm = normalizeReferenceText(
+        url.hostname.replace(/^www\./iu, ''),
+      );
       if (hostTerm.length >= 2) {
         terms.add(hostTerm);
       }
@@ -552,7 +506,10 @@ function collectEventDataReferenceTerms(
     return;
   }
 
-  for (const nested of Object.values(value as Record<string, unknown>).slice(0, 10)) {
+  for (const nested of Object.values(value as Record<string, unknown>).slice(
+    0,
+    10,
+  )) {
     collectEventDataReferenceTerms(nested, terms, depth + 1);
   }
 }
@@ -659,8 +616,7 @@ function renderInlineEventCard(params: {
         ? h(
             'div',
             {
-              class:
-                'mt-1 text-xs leading-5 break-words text-muted-foreground',
+              class: 'mt-1 text-xs leading-5 break-words text-muted-foreground',
             },
             params.detail.description,
           )
@@ -846,7 +802,8 @@ function renderMessageHeader(
 }
 
 function renderMessageAvatar(message: ChatMessageItem): BubbleProps['avatar'] {
-  return h(AAvatar, undefined, () => (message.role === 'user' ? '你' : 'AI'));
+  const aAvatar = resolveComponent('a-avatar');
+  return h(aAvatar, undefined, () => (message.role === 'user' ? '你' : 'AI'));
 }
 
 function getMessageActionItems(
@@ -945,7 +902,6 @@ export function createChatBubbleListRole(
       return {
         avatar: renderMessageAvatar(message),
         class: 'mb-3.5',
-        classes: getMessageBubbleClasses(message),
         editable: false,
         footer: renderMessageFooter(message, options),
         footerPlacement: 'outer-start',
@@ -973,7 +929,6 @@ export function createChatBubbleListRole(
       return {
         avatar: renderMessageAvatar(message),
         class: 'mb-3.5',
-        classes: getMessageBubbleClasses(message),
         editable: options.isEditingMessage(message)
           ? {
               cancelText: '取消',
