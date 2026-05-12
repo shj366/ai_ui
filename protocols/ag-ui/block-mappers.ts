@@ -4,6 +4,7 @@ import type {
   AIChatAttachmentType,
   AIChatEventMessageBlock,
   AIChatFileMessageBlock,
+  AIChatMessageBlock,
 } from '#/plugins/ai/types/message';
 
 import {
@@ -11,6 +12,8 @@ import {
   normalizeAIChatFileBlock,
   uniqueAIChatEventTypes,
 } from '#/plugins/ai/runtime/message';
+
+import { isRecord, parseDataUrl } from './utils';
 
 function buildAGUIDataUrl(
   data?: null | string,
@@ -136,4 +139,148 @@ export function createAGUIBinaryFileBlock(params: {
         params.urlMimeTypeFallback,
       ),
   });
+}
+
+function getStringValue(record: Record<string, unknown>, ...keys: string[]) {
+  for (const key of keys) {
+    const value = record[key];
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return null;
+}
+
+function inferAttachmentType(
+  fileType?: null | string,
+  mimeType?: null | string,
+): AIChatAttachmentType | null {
+  if (
+    fileType === 'audio' ||
+    fileType === 'document' ||
+    fileType === 'image' ||
+    fileType === 'video'
+  ) {
+    return fileType;
+  }
+
+  if (mimeType?.startsWith('audio/')) {
+    return 'audio';
+  }
+  if (mimeType?.startsWith('image/')) {
+    return 'image';
+  }
+  if (mimeType?.startsWith('video/')) {
+    return 'video';
+  }
+  if (mimeType) {
+    return 'document';
+  }
+
+  return null;
+}
+
+function expandToolResultValues(value: unknown): unknown[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (!isRecord(value)) {
+    return [value];
+  }
+
+  for (const key of ['data', 'files', 'images', 'outputs', 'results']) {
+    const nested = value[key];
+    if (Array.isArray(nested)) {
+      return nested;
+    }
+  }
+
+  return [value];
+}
+
+function createToolResultFileBlock(
+  value: unknown,
+): AIChatFileMessageBlock | null {
+  if (typeof value === 'string') {
+    const text = value.trim();
+    if (!text) {
+      return null;
+    }
+
+    const parsed = parseDataUrl(text);
+    if (parsed) {
+      return createAGUIBinaryFileBlock({
+        fileType: inferAttachmentType(null, parsed.mimeType),
+        mimeType: parsed.mimeType,
+        url: text,
+      });
+    }
+
+    if (/^https?:\/\//iu.test(text)) {
+      return createAGUIBinaryFileBlock({ url: text });
+    }
+
+    return null;
+  }
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const rawUrl =
+    getStringValue(value, 'url', 'href', 'sourceUrl', 'source_url') ??
+    getStringValue(value, 'value');
+  const dataUrl = rawUrl ? parseDataUrl(rawUrl) : null;
+  const rawData = getStringValue(
+    value,
+    'b64_json',
+    'base64',
+    'base64Data',
+    'base64_data',
+    'data',
+  );
+  const dataAsUrl = rawData ? parseDataUrl(rawData) : null;
+  const url = dataAsUrl ? rawData : rawUrl;
+  const data = dataAsUrl || dataUrl ? null : rawData;
+  const mimeType =
+    getStringValue(value, 'mimeType', 'mime_type', 'mediaType', 'contentType') ??
+    dataAsUrl?.mimeType ??
+    dataUrl?.mimeType ??
+    (rawData && !dataAsUrl ? 'image/png' : null);
+  const rawFileType = getStringValue(value, 'fileType', 'file_type', 'type');
+  const fileType = inferAttachmentType(rawFileType, mimeType);
+
+  if (!url && !data) {
+    return null;
+  }
+
+  return createAGUIBinaryFileBlock({
+    data,
+    fileType,
+    mimeType,
+    name: getStringValue(value, 'name', 'filename', 'fileName'),
+    url,
+    urlMimeTypeFallback: mimeType,
+  });
+}
+
+export function normalizeAGUIToolResultBlocks(
+  content: string,
+): AIChatMessageBlock[] {
+  const text = content.trim();
+  if (!text) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(text) as unknown;
+    return expandToolResultValues(parsed)
+      .map((value) => createToolResultFileBlock(value))
+      .filter((block): block is AIChatFileMessageBlock => block !== null);
+  } catch {
+    const block = createToolResultFileBlock(text);
+    return block ? [block] : [];
+  }
 }

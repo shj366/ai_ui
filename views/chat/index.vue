@@ -37,7 +37,6 @@ import { IconifyIcon } from '@vben/icons';
 import { usePreferences } from '@vben/preferences';
 
 import { BubbleList, Suggestion, Welcome } from '@antdv-next/x';
-import { useClipboard } from '@vueuse/core';
 import { message } from 'antdv-next';
 
 import { useVbenForm } from '#/adapter/form';
@@ -59,7 +58,6 @@ import {
 import {
   buildTransientMessageItems,
   createProviderUserMessage,
-  getMessageFileBlocks,
   getMessageTextContent,
   makeConversationTitle,
   mergeStreamMessage,
@@ -94,7 +92,6 @@ const currentChatProtocolOptions = {
   protocolName: currentChatProtocolName,
 } as const;
 
-const { copy } = useClipboard({ legacy: true });
 const { isDark } = usePreferences();
 const prompt = ref('');
 const draftConversationTitle = ref('新话题');
@@ -201,6 +198,17 @@ const {
   generationType,
   generationTypeButtonLabel,
   hasAdvancedSettings,
+  imageAction,
+  imageAspectRatio,
+  imageBackground,
+  imageInputFidelity,
+  imageModel,
+  imageModeration,
+  imageOutputCompression,
+  imageOutputFormat,
+  imagePartialImages,
+  imageQuality,
+  imageSize,
   logitBias,
   maxTokens,
   parallelToolCalls,
@@ -400,19 +408,6 @@ async function regenerateUserMessage(item: ChatMessageItem) {
   await submitChat(item.message_id, true, undefined, 'user');
 }
 
-async function copyMessageContent(item: ChatMessageItem) {
-  const sections = [
-    getMessageTextContent(item, 'text'),
-    getMessageTextContent(item, 'reasoning'),
-    ...getMessageFileBlocks(item).map((block) =>
-      [block.name, block.url].filter(Boolean).join(' - '),
-    ),
-  ].filter(Boolean);
-
-  await copy(sections.join('\n\n'));
-  message.success('消息内容已复制');
-}
-
 async function startRenameConversation(
   conversation?: AIChatConversationResult,
 ) {
@@ -546,6 +541,17 @@ async function submitChat(
           value !== null && typeof value === 'object' && !Array.isArray(value),
       ),
       frequency_penalty: frequencyPenalty.value,
+      image_action: imageAction.value,
+      image_aspect_ratio: imageAspectRatio.value,
+      image_background: imageBackground.value,
+      image_input_fidelity: imageInputFidelity.value,
+      image_model: imageModel.value.trim() || undefined,
+      image_moderation: imageModeration.value,
+      image_output_compression: imageOutputCompression.value,
+      image_output_format: imageOutputFormat.value,
+      image_partial_images: imagePartialImages.value,
+      image_quality: imageQuality.value,
+      image_size: imageSize.value,
       logit_bias: parseJsonField<Record<string, number>>(
         logitBias.value,
         'Logit Bias',
@@ -771,8 +777,18 @@ const transientMessages = computed<ChatMessageItem[]>(() => {
   });
 });
 
+function shouldRenderChatMessage(message: ChatMessageItem) {
+  if (message.message_type === 'error') {
+    return Boolean(getMessageTextContent(message, 'text').trim());
+  }
+
+  return currentChatProtocol.getRenderableBlocks(message).length > 0;
+}
+
 const displayMessages = computed<ChatMessageItem[]>(() => {
-  return [...activeMessages.value, ...transientMessages.value];
+  return [...activeMessages.value, ...transientMessages.value].filter(
+    shouldRenderChatMessage,
+  );
 });
 
 const { isThinkingExpanded, setThinkingExpanded } = useThinkingPanel({
@@ -1044,7 +1060,6 @@ const bubbleListRole = computed<BubbleListProps['role']>(() =>
     onBeginEditMessage: beginEditMessage,
     onCancelEditMessage: cancelEditMessage,
     onConfirmDeleteMessage: confirmDeleteMessage,
-    onCopyMessage: copyMessageContent,
     onRegenerateMessage: regenerateMessage,
     onRegenerateUserMessage: regenerateUserMessage,
     onResendEditedMessage: resendEditedMessage,
@@ -1330,6 +1345,18 @@ onBeforeUnmount(() => {
         v-model:extra-body="extraBody"
         v-model:extra-headers="extraHeaders"
         v-model:frequency-penalty="frequencyPenalty"
+        :generation-type="generationType"
+        v-model:image-action="imageAction"
+        v-model:image-aspect-ratio="imageAspectRatio"
+        v-model:image-background="imageBackground"
+        v-model:image-input-fidelity="imageInputFidelity"
+        v-model:image-model="imageModel"
+        v-model:image-moderation="imageModeration"
+        v-model:image-output-compression="imageOutputCompression"
+        v-model:image-output-format="imageOutputFormat"
+        v-model:image-partial-images="imagePartialImages"
+        v-model:image-quality="imageQuality"
+        v-model:image-size="imageSize"
         v-model:logit-bias="logitBias"
         v-model:max-tokens="maxTokens"
         v-model:parallel-tool-calls="parallelToolCalls"

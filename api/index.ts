@@ -90,6 +90,8 @@ export interface AIMcpParams {
   env?: null | Recordable<unknown>;
   timeout?: null | number;
   read_timeout?: null | number;
+  tool_prefix?: null | string;
+  include_instructions?: boolean;
 }
 
 export interface AIMcpResult extends AIMcpParams {
@@ -135,7 +137,10 @@ export async function createAIProviderApi(data: AIProviderParams) {
   return requestClient.post<AIActionResult>('/api/v1/providers', data);
 }
 
-export async function updateAIProviderApi(pk: number, data: AIProviderUpdateParams) {
+export async function updateAIProviderApi(
+  pk: number,
+  data: AIProviderUpdateParams,
+) {
   return requestClient.put<AIActionResult>(`/api/v1/providers/${pk}`, data);
 }
 

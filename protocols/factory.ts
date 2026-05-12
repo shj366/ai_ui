@@ -1,5 +1,3 @@
-import type { SourcesProps } from '@antdv-next/x';
-
 import type {
   AIChatCompletionParams,
   AIChatConversationDetail,
@@ -10,7 +8,7 @@ import type {
   AIChatProviderMessage,
   ChatMessageItem,
 } from '../runtime/message';
-import type { AIChatEventMessageBlock } from '../types/message';
+import type { AIChatRenderableBlock } from '../types/render';
 
 import { createAGUIProtocolDriver } from './ag-ui';
 
@@ -53,27 +51,7 @@ export interface AIChatProtocol<
   ): TMessage;
 }
 
-export interface AIChatProtocolEventPresentationSection {
-  items?: NonNullable<SourcesProps['items']>;
-  kind: 'raw-payload' | 'sources' | 'text';
-  language?: string;
-  secondary?: boolean;
-  text?: string;
-}
-
-export interface AIChatProtocolEventPresentationResult {
-  description?: string;
-  hasOnlySources: boolean;
-  isSearchEvent: boolean;
-  sections: AIChatProtocolEventPresentationSection[];
-  showRawPayloadByDefault: boolean;
-  title?: string;
-}
-
 export interface AIChatProtocolDriver {
-  buildEventPresentation(
-    block: AIChatEventMessageBlock,
-  ): AIChatProtocolEventPresentationResult;
   buildChatCompletionRequest(
     input: BuildChatCompletionRequestInput,
     forwardedProps: AIChatCompletionParams['forwardedProps'],
@@ -82,18 +60,11 @@ export interface AIChatProtocolDriver {
     AIChatProtocolChunk,
     AIChatProviderMessage
   >;
+  getRenderableBlocks(message: ChatMessageItem): AIChatRenderableBlock[];
   name: AIChatProtocolName;
   normalizeConversationDetail(
     detail: AIChatConversationDetailResult,
   ): AIChatConversationDetail;
-  shouldRenderEventTextAsCode(
-    text: string,
-    eventType: AIChatEventMessageBlock['event_type'],
-  ): boolean;
-  shouldSuppressEventBlock(
-    message: ChatMessageItem,
-    block: AIChatEventMessageBlock,
-  ): boolean;
 }
 
 const AI_CHAT_PROTOCOL_DRIVER_FACTORIES: Record<

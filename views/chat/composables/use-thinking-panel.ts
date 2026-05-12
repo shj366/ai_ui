@@ -2,13 +2,14 @@ import type { ComputedRef, Ref } from 'vue';
 
 import type { ChatMessageItem } from '#/plugins/ai/runtime/message';
 
-import { ref, watch } from 'vue';
+import { nextTick, ref, watch } from 'vue';
 
 import { getMessageTextContent } from '#/plugins/ai/runtime/message';
 
 type ThinkingPanelState = {
   autoOpened: boolean;
   expanded: boolean;
+  manualTouched: boolean;
 };
 
 export interface UseThinkingPanelOptions {
@@ -42,14 +43,29 @@ export function useThinkingPanel(options: UseThinkingPanelOptions) {
 
   function setThinkingExpanded(message: ChatMessageItem, expanded: boolean) {
     const key = getThinkingPanelKey(message);
-    const current = thinkingPanelStates.value[key];
     thinkingPanelStates.value = {
       ...thinkingPanelStates.value,
       [key]: {
-        autoOpened: current?.autoOpened ?? false,
+        autoOpened: false,
         expanded,
+        manualTouched: true,
       },
     };
+  }
+
+  function hasThinkingPanelStateChanged(
+    previous: ThinkingPanelState | undefined,
+    next: ThinkingPanelState,
+  ) {
+    if (!previous) {
+      return true;
+    }
+
+    return (
+      previous.autoOpened !== next.autoOpened ||
+      previous.expanded !== next.expanded ||
+      previous.manualTouched !== next.manualTouched
+    );
   }
 
   watch(
@@ -72,25 +88,30 @@ export function useThinkingPanel(options: UseThinkingPanelOptions) {
           message.streaming && !hasTextStarted,
         );
 
+        if (previous?.manualTouched) {
+          nextStates[key] = previous;
+          continue;
+        }
+
         if (shouldAutoExpand) {
-          if (!previous?.expanded || !previous?.autoOpened) {
-            hasChanges = true;
-          }
-          nextStates[key] = {
+          const nextState = {
             autoOpened: true,
             expanded: true,
+            manualTouched: false,
           };
+          hasChanges ||= hasThinkingPanelStateChanged(previous, nextState);
+          nextStates[key] = nextState;
           continue;
         }
 
         if (previous?.autoOpened) {
-          if (previous.expanded !== false) {
-            hasChanges = true;
-          }
-          nextStates[key] = {
+          const nextState = {
             autoOpened: false,
             expanded: false,
+            manualTouched: false,
           };
+          hasChanges ||= hasThinkingPanelStateChanged(previous, nextState);
+          nextStates[key] = nextState;
           continue;
         }
 
@@ -106,7 +127,9 @@ export function useThinkingPanel(options: UseThinkingPanelOptions) {
       }
 
       if (messages.length > 0 && autoFollowMessageScroll.value) {
-        scrollToBottom();
+        nextTick(() => {
+          scrollToBottom();
+        });
       }
     },
     { immediate: true },

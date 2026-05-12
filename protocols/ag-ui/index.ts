@@ -1,6 +1,9 @@
 import type { AIChatProviderMessage } from '../../runtime/message';
-import type { AIChatProtocolDriver } from '../factory';
-import type { AIChatProtocol, AIChatProtocolChunk } from '../factory';
+import type {
+  AIChatProtocol,
+  AIChatProtocolChunk,
+  AIChatProtocolDriver,
+} from '../factory';
 import type { AGUIStreamAccumulator } from './runtime-state';
 
 import type {
@@ -17,11 +20,7 @@ import {
 } from '../../runtime/message';
 import { AG_UI_AI_CHAT_PROTOCOL_NAME } from '../factory';
 import { normalizeAGUIConversationDetail } from './deserialize';
-import {
-  buildAGUIEventPresentation,
-  shouldRenderAGUIEventTextAsCode,
-  shouldSuppressAGUIEventBlock,
-} from './event-presentation';
+import { getAGUIRenderableBlocks } from './renderable-blocks';
 import {
   toAIChatMessageFromAGUIEvent,
 } from './runtime-events';
@@ -155,9 +154,6 @@ export function createAGUIProtocol(): AIChatProtocol<
 
 export function createAGUIProtocolDriver(): AIChatProtocolDriver {
   return {
-    buildEventPresentation(block) {
-      return buildAGUIEventPresentation(block);
-    },
     buildChatCompletionRequest(
       input: BuildChatCompletionRequestInput,
       forwardedProps: AIChatCompletionParams['forwardedProps'],
@@ -165,17 +161,14 @@ export function createAGUIProtocolDriver(): AIChatProtocolDriver {
       return buildAGUIChatCompletionRequest(input, forwardedProps);
     },
     createRuntimeProtocol: () => createAGUIProtocol(),
+    getRenderableBlocks(message) {
+      return getAGUIRenderableBlocks(message);
+    },
     name: AG_UI_AI_CHAT_PROTOCOL_NAME,
     normalizeConversationDetail(
       detail: AIChatConversationDetailResult,
     ): AIChatConversationDetail {
       return normalizeAGUIConversationDetail(detail);
-    },
-    shouldRenderEventTextAsCode(text, eventType) {
-      return shouldRenderAGUIEventTextAsCode(text, eventType);
-    },
-    shouldSuppressEventBlock(message, block) {
-      return shouldSuppressAGUIEventBlock(message, block);
     },
   };
 }

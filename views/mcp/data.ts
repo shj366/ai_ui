@@ -75,6 +75,8 @@ const MCP_IMPORT_DEMOS = [
               'Content-Type': 'application/json',
               Authorization: 'Bearer your-token',
             },
+            toolPrefix: 'demo',
+            includeInstructions: true,
           },
         },
       },
@@ -132,6 +134,15 @@ export function useMcpColumns(
     { field: 'description', title: '描述', align: 'left' },
     { field: 'url', title: '端点链接', align: 'left' },
     { field: 'command', title: '命令', align: 'left' },
+    { field: 'tool_prefix', title: '工具前缀', width: 120 },
+    {
+      field: 'include_instructions',
+      title: '注入说明',
+      width: 100,
+      formatter({ cellValue }) {
+        return cellValue ? '是' : '否';
+      },
+    },
     { field: 'timeout', title: '初始化超时(s)', width: 120 },
     { field: 'read_timeout', title: '读取超时(s)', width: 120 },
     {
@@ -189,7 +200,8 @@ export const mcpSchema: VbenFormSchema[] = [
     component: 'Textarea',
     componentProps: {
       autoSize: { minRows: 4, maxRows: 10 },
-      placeholder: 'Authorization=Bearer your-token\nContent-Type=application/json',
+      placeholder:
+        'Authorization=Bearer your-token\nContent-Type=application/json',
     },
     fieldName: 'headers',
     help: '格式为 KEY=VALUE，每行一个',
@@ -226,6 +238,22 @@ export const mcpSchema: VbenFormSchema[] = [
       show: (values) => values?.type === 0,
       triggerFields: ['type'],
     },
+  },
+  {
+    component: 'Input',
+    componentProps: {
+      placeholder: '例如 server_name',
+    },
+    fieldName: 'tool_prefix',
+    help: '可选；用于避免多个 MCP 的工具名称冲突',
+    label: '工具名称前缀',
+  },
+  {
+    component: 'Switch',
+    defaultValue: false,
+    fieldName: 'include_instructions',
+    help: '开启后会把 MCP 服务说明注入到模型上下文',
+    label: '注入 MCP 服务说明',
   },
   {
     component: 'InputNumber',
@@ -356,7 +384,9 @@ export function parseMcpImportJson(value: string): AIMcpParams {
   }
 
   if (servers.length !== 1) {
-    throw new Error('当前仅支持导入单个 MCP，请确保 mcpServers 中只包含一项配置');
+    throw new Error(
+      '当前仅支持导入单个 MCP，请确保 mcpServers 中只包含一项配置',
+    );
   }
 
   const firstServer = servers[0];
@@ -374,12 +404,14 @@ export function parseMcpImportJson(value: string): AIMcpParams {
     throw new Error('服务器名称不能为空');
   }
 
-  const command = typeof item.command === 'string' && item.command.trim()
-    ? item.command.trim()
-    : undefined;
-  const url = typeof item.url === 'string' && item.url.trim()
-    ? item.url.trim()
-    : undefined;
+  const command =
+    typeof item.command === 'string' && item.command.trim()
+      ? item.command.trim()
+      : undefined;
+  const url =
+    typeof item.url === 'string' && item.url.trim()
+      ? item.url.trim()
+      : undefined;
 
   let type: number | undefined;
   if (command) {
@@ -387,9 +419,15 @@ export function parseMcpImportJson(value: string): AIMcpParams {
   } else if (url) {
     const transportValue = item.transportType ?? item.type ?? item.transport;
     if (typeof transportValue === 'string') {
-      const normalizedTransport = transportValue.trim().toLowerCase().replaceAll(/\s+/gu, '_');
+      const normalizedTransport = transportValue
+        .trim()
+        .toLowerCase()
+        .replaceAll(/\s+/gu, '_');
       if (normalizedTransport in MCP_TYPE_NAME_MAP) {
-        type = MCP_TYPE_NAME_MAP[normalizedTransport as keyof typeof MCP_TYPE_NAME_MAP];
+        type =
+          MCP_TYPE_NAME_MAP[
+            normalizedTransport as keyof typeof MCP_TYPE_NAME_MAP
+          ];
       }
     }
 
@@ -404,7 +442,10 @@ export function parseMcpImportJson(value: string): AIMcpParams {
 
   let args: string[] | undefined;
   if (item.args !== null && item.args !== undefined && item.args !== '') {
-    if (!Array.isArray(item.args) || item.args.some((arg) => typeof arg !== 'string')) {
+    if (
+      !Array.isArray(item.args) ||
+      item.args.some((arg) => typeof arg !== 'string')
+    ) {
       throw new Error(`MCP ${name} 的 args 必须是字符串数组`);
     }
 
@@ -421,24 +462,51 @@ export function parseMcpImportJson(value: string): AIMcpParams {
     }
 
     env = Object.fromEntries(
-      Object.entries(item.env).map(([key, itemValue]) => [key, String(itemValue ?? '')]),
+      Object.entries(item.env).map(([key, itemValue]) => [
+        key,
+        String(itemValue ?? ''),
+      ]),
     );
   }
 
   let headers: Record<string, string> | undefined;
-  if (item.headers !== null && item.headers !== undefined && item.headers !== '') {
+  if (
+    item.headers !== null &&
+    item.headers !== undefined &&
+    item.headers !== ''
+  ) {
     if (!isRecord(item.headers)) {
       throw new Error(`MCP ${name} 的 headers 必须是 JSON 对象`);
     }
 
     headers = Object.fromEntries(
-      Object.entries(item.headers).map(([key, itemValue]) => [key, String(itemValue ?? '')]),
+      Object.entries(item.headers).map(([key, itemValue]) => [
+        key,
+        String(itemValue ?? ''),
+      ]),
     );
   }
 
-  const description = typeof item.description === 'string' && item.description.trim()
-    ? item.description.trim()
-    : undefined;
+  const description =
+    typeof item.description === 'string' && item.description.trim()
+      ? item.description.trim()
+      : undefined;
+
+  const rawToolPrefix = item.tool_prefix ?? item.toolPrefix;
+  const toolPrefix =
+    typeof rawToolPrefix === 'string' && rawToolPrefix.trim()
+      ? rawToolPrefix.trim()
+      : undefined;
+
+  const rawIncludeInstructions =
+    item.include_instructions ?? item.includeInstructions;
+  if (
+    rawIncludeInstructions !== null &&
+    rawIncludeInstructions !== undefined &&
+    typeof rawIncludeInstructions !== 'boolean'
+  ) {
+    throw new Error(`MCP ${name} 的 include_instructions 必须是布尔值`);
+  }
 
   const timeout = item.timeout;
   if (
@@ -455,7 +523,9 @@ export function parseMcpImportJson(value: string): AIMcpParams {
     readTimeout !== null &&
     readTimeout !== undefined &&
     readTimeout !== '' &&
-    (typeof readTimeout !== 'number' || Number.isNaN(readTimeout) || readTimeout < 0)
+    (typeof readTimeout !== 'number' ||
+      Number.isNaN(readTimeout) ||
+      readTimeout < 0)
   ) {
     throw new Error(`MCP ${name} 的 read_timeout 必须是大于等于 0 的数字`);
   }
@@ -466,9 +536,14 @@ export function parseMcpImportJson(value: string): AIMcpParams {
     description,
     env,
     headers,
+    include_instructions:
+      typeof rawIncludeInstructions === 'boolean'
+        ? rawIncludeInstructions
+        : undefined,
     name,
     read_timeout: typeof readTimeout === 'number' ? readTimeout : undefined,
     timeout: typeof timeout === 'number' ? timeout : undefined,
+    tool_prefix: toolPrefix,
     type,
     url,
   };

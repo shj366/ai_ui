@@ -37,6 +37,18 @@ export function getEventText(value: unknown) {
   return typeof value === 'string' ? value : '';
 }
 
+export function resolveMetadataFilename(metadata: unknown) {
+  if (typeof metadata === 'string') {
+    return metadata.trim() || null;
+  }
+
+  if (isRecord(metadata) && typeof metadata.filename === 'string') {
+    return metadata.filename.trim() || null;
+  }
+
+  return null;
+}
+
 export function parseDataUrl(url: string) {
   const match = /^data:([^;,]+)?;base64,(.+)$/u.exec(url);
   if (!match) {

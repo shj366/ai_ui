@@ -155,33 +155,30 @@ function useChatStream(chatProvider: AIChatProvider) {
 
       const currentMessage =
         messageInfo?.message ?? createProviderSeedMessage();
-      const fallbackText =
-        error.name === 'AbortError'
-          ? '已停止生成'
-          : error.message || '生成失败';
       const hasContent = currentMessage.blocks.some((block) => {
         if (block.type === 'file') {
           return Boolean(block.url || block.name);
         }
         return Boolean(block.text?.trim());
       });
+      const fallbackBlocks =
+        error.name !== 'AbortError' && error.message.trim()
+          ? [
+              {
+                text: error.message,
+                type: 'text' as const,
+              },
+            ]
+          : [];
 
       return {
         ...currentMessage,
-        blocks: hasContent
-          ? currentMessage.blocks
-          : [
-              {
-                text: fallbackText,
-                type: 'text',
-              },
-            ],
+        blocks: hasContent ? currentMessage.blocks : fallbackBlocks,
         created_time: currentMessage.created_time || new Date().toISOString(),
         message_type: error.name === 'AbortError' ? 'normal' : 'error',
         role: currentMessage.role || 'assistant',
       };
     },
-    requestPlaceholder: () => createProviderSeedMessage(),
   });
 
   function abort() {

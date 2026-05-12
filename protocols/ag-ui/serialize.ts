@@ -71,7 +71,7 @@ function toAGUIUserFileContent(
     return null;
   }
 
-  const metadata = block.name ? { filename: block.name } : null;
+  const metadata = block.name?.trim() || null;
 
   switch (block.file_type) {
     case 'audio': {
@@ -255,8 +255,10 @@ function toAGUIAssistantMessages(
     if (block.event_type === AGUI_SYSTEM_MESSAGE_EVENT_TYPE) {
       flushAssistantMessage();
       const content =
-        (typeof data?.content === 'string' ? data.content : block.text)?.trim() ||
-        '';
+        (typeof data?.content === 'string'
+          ? data.content
+          : block.text
+        )?.trim() || '';
       if (!content) {
         continue;
       }
@@ -276,8 +278,10 @@ function toAGUIAssistantMessages(
     if (block.event_type === AGUI_DEVELOPER_MESSAGE_EVENT_TYPE) {
       flushAssistantMessage();
       const content =
-        (typeof data?.content === 'string' ? data.content : block.text)?.trim() ||
-        '';
+        (typeof data?.content === 'string'
+          ? data.content
+          : block.text
+        )?.trim() || '';
       if (!content) {
         continue;
       }
@@ -310,8 +314,10 @@ function toAGUIAssistantMessages(
       const toolCallId =
         typeof data.toolCallId === 'string' ? data.toolCallId : '';
       const content =
-        (typeof data.content === 'string' ? data.content : block.text)?.trim() ||
-        (typeof data.error === 'string' ? data.error.trim() : '');
+        (typeof data.content === 'string'
+          ? data.content
+          : block.text
+        )?.trim() || (typeof data.error === 'string' ? data.error.trim() : '');
 
       if (!toolCallId || !content) {
         continue;

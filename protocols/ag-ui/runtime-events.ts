@@ -17,20 +17,15 @@ import type {
 
 import type { AGUIStreamAccumulator } from './runtime-state';
 
-import type {
-  AIChatProviderMessage,
-} from '#/plugins/ai/runtime/message';
-import type {
-  AGUIStreamEvent,
-} from '#/plugins/ai/types/ag-ui';
-import type {
-  AIChatMessageBlock,
-} from '#/plugins/ai/types/message';
+import type { AIChatProviderMessage } from '#/plugins/ai/runtime/message';
+import type { AGUIStreamEvent } from '#/plugins/ai/types/ag-ui';
+import type { AIChatMessageBlock } from '#/plugins/ai/types/message';
 
 import {
   createAGUIBinaryFileBlock,
   createAGUIEventBlock,
   createAGUIInputSourceFileBlock,
+  normalizeAGUIToolResultBlocks,
 } from './block-mappers';
 import {
   clearAGUIStreamAccumulator,
@@ -52,14 +47,46 @@ import {
   resolveToolCallId,
   resolveToolCallName,
 } from './runtime-state';
-import { getEventText, resolveTimestamp } from './utils';
+import {
+  getEventText,
+  resolveMetadataFilename,
+  resolveTimestamp,
+} from './utils';
 
 type AGUIEventHandler = (
   event: AGUIStreamEvent,
   accumulator: AGUIStreamAccumulator,
 ) => AIChatProviderMessage | null;
 
-function handleActivityDelta(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function resolveCurrentMessageId(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
+  return resolveMessageId(event) ?? accumulator.currentMessageId ?? undefined;
+}
+
+function resolveCurrentReasoningMessageId(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
+  return (
+    resolveMessageId(event) ??
+    accumulator.currentReasoningMessageId ??
+    accumulator.thinking?.messageId
+  );
+}
+
+function resolveCurrentToolCallId(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
+  return resolveToolCallId(event) ?? accumulator.currentToolCallId ?? undefined;
+}
+
+function handleActivityDelta(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const current = event as ActivityDeltaEvent;
   const activityType = resolveActivityType(current) ?? 'activity';
   const messageId = resolveMessageId(current) ?? 'activity';
@@ -68,7 +95,12 @@ function handleActivityDelta(event: AGUIStreamEvent, accumulator: AGUIStreamAccu
     resolveTimestamp(event.timestamp),
     [
       createAGUIEventBlock({
-        data: { activityType, messageId, patch: current.patch, snapshot: undefined },
+        data: {
+          activityType,
+          messageId,
+          patch: current.patch,
+          snapshot: undefined,
+        },
         eventKey: `activity:${messageId}`,
         eventType: current.type,
         status: 'running',
@@ -80,18 +112,28 @@ function handleActivityDelta(event: AGUIStreamEvent, accumulator: AGUIStreamAccu
   );
 }
 
-function handleActivitySnapshot(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleActivitySnapshot(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const current = event as ActivitySnapshotEvent;
   const activityType = resolveActivityType(current) ?? 'activity';
   const messageId = resolveMessageId(current) ?? 'activity';
   const blocks: AIChatMessageBlock[] = [];
   const files =
-    current.content && typeof current.content === 'object' && 'file' in current.content
+    current.content &&
+    typeof current.content === 'object' &&
+    'file' in current.content
       ? [current.content.file]
       : [];
 
   for (const file of files) {
-    if (!file || typeof file !== 'object' || !('type' in file) || typeof file.type !== 'string') {
+    if (
+      !file ||
+      typeof file !== 'object' ||
+      !('type' in file) ||
+      typeof file.type !== 'string'
+    ) {
       continue;
     }
 
@@ -109,25 +151,27 @@ function handleActivitySnapshot(event: AGUIStreamEvent, accumulator: AGUIStreamA
           createAGUIInputSourceFileBlock(
             file.type,
             source,
-            'metadata' in file &&
-              file.metadata &&
-              typeof file.metadata === 'object' &&
-              'filename' in file.metadata &&
-              typeof file.metadata.filename === 'string'
-              ? file.metadata.filename
-              : null,
+            'metadata' in file ? resolveMetadataFilename(file.metadata) : null,
           ),
         );
         break;
       }
       case 'binary': {
-        const mimeType = typeof file.mimeType === 'string' ? file.mimeType : null;
+        const mimeType =
+          typeof file.mimeType === 'string' ? file.mimeType : null;
         blocks.push(
           createAGUIBinaryFileBlock({
-            data: 'data' in file && typeof file.data === 'string' ? file.data : null,
+            data:
+              'data' in file && typeof file.data === 'string'
+                ? file.data
+                : null,
             mimeType,
-            name: 'filename' in file && typeof file.filename === 'string' ? file.filename : null,
-            url: 'url' in file && typeof file.url === 'string' ? file.url : null,
+            name:
+              'filename' in file && typeof file.filename === 'string'
+                ? file.filename
+                : null,
+            url:
+              'url' in file && typeof file.url === 'string' ? file.url : null,
           }),
         );
         break;
@@ -154,7 +198,10 @@ function handleActivitySnapshot(event: AGUIStreamEvent, accumulator: AGUIStreamA
   );
 }
 
-function handleMessagesSnapshot(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleMessagesSnapshot(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   return createStreamMessage(
     'assistant',
     resolveTimestamp(event.timestamp),
@@ -172,7 +219,10 @@ function handleMessagesSnapshot(event: AGUIStreamEvent, accumulator: AGUIStreamA
   );
 }
 
-function handleReasoningEncryptedValue(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleReasoningEncryptedValue(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const current = event as ReasoningEncryptedValueEvent;
   const entityId = resolveReasoningEntityId(current);
   const state = createOrGetThinkingState(event, accumulator, entityId);
@@ -193,8 +243,12 @@ function handleReasoningEncryptedValue(event: AGUIStreamEvent, accumulator: AGUI
   );
 }
 
-function handleReasoningEnd(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleReasoningEnd(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const state = createOrGetThinkingState(event, accumulator);
+  accumulator.currentReasoningMessageId = null;
   clearThinkingState(accumulator, resolveMessageId(event));
   return createStreamMessage(
     'assistant',
@@ -213,13 +267,28 @@ function handleReasoningEnd(event: AGUIStreamEvent, accumulator: AGUIStreamAccum
   );
 }
 
-function handleReasoningContent(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
-  const messageId = resolveMessageId(event);
+function handleReasoningContent(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
+  const messageId = resolveCurrentReasoningMessageId(event, accumulator);
   if (!messageId) {
     return null;
   }
 
-  const state = createOrGetMessageState(messageId, event, accumulator, 'assistant');
+  if (event.type === 'REASONING_MESSAGE_CHUNK' && !getDeltaFromEvent(event)) {
+    accumulator.currentReasoningMessageId = null;
+    clearThinkingState(accumulator, messageId);
+    return null;
+  }
+
+  accumulator.currentReasoningMessageId = messageId;
+  const state = createOrGetMessageState(
+    messageId,
+    event,
+    accumulator,
+    'assistant',
+  );
   return createStreamMessage(
     'assistant',
     resolveTimestamp(event.timestamp, state.createdTime),
@@ -228,13 +297,22 @@ function handleReasoningContent(event: AGUIStreamEvent, accumulator: AGUIStreamA
   );
 }
 
-function handleReasoningMessageEnd(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleReasoningMessageEnd(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const messageId = resolveMessageId(event);
   if (!messageId) {
     return null;
   }
 
-  const state = createOrGetMessageState(messageId, event, accumulator, 'assistant');
+  const state = createOrGetMessageState(
+    messageId,
+    event,
+    accumulator,
+    'assistant',
+  );
+  accumulator.currentReasoningMessageId = null;
   clearThinkingState(accumulator, messageId);
   return createStreamMessage(
     'assistant',
@@ -253,13 +331,22 @@ function handleReasoningMessageEnd(event: AGUIStreamEvent, accumulator: AGUIStre
   );
 }
 
-function handleReasoningMessageStart(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleReasoningMessageStart(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const messageId = resolveMessageId(event);
   if (!messageId) {
     return null;
   }
 
-  const state = createOrGetMessageState(messageId, event, accumulator, 'assistant');
+  const state = createOrGetMessageState(
+    messageId,
+    event,
+    accumulator,
+    'assistant',
+  );
+  accumulator.currentReasoningMessageId = messageId;
   createOrGetThinkingState(event, accumulator, messageId);
   return createStreamMessage(
     'assistant',
@@ -278,7 +365,10 @@ function handleReasoningMessageStart(event: AGUIStreamEvent, accumulator: AGUISt
   );
 }
 
-function handleReasoningStart(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleReasoningStart(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const state = createOrGetThinkingState(event, accumulator);
   return createStreamMessage(
     'assistant',
@@ -300,17 +390,28 @@ function handleReasoningStart(event: AGUIStreamEvent, accumulator: AGUIStreamAcc
   );
 }
 
-function handleRunError(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleRunError(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   return createStreamMessage(
     'assistant',
     resolveTimestamp(event.timestamp),
-    [{ text: 'message' in event ? getEventText(event.message) : '', type: 'text' }],
+    [
+      {
+        text: 'message' in event ? getEventText(event.message) : '',
+        type: 'text',
+      },
+    ],
     resolveConversationId(event, accumulator) ?? null,
     { message_type: 'error' },
   );
 }
 
-function handleRunFinished(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleRunFinished(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const current = event as RunFinishedEvent;
   const runId = resolveRunId(current);
   const threadId = resolveThreadId(current);
@@ -336,7 +437,10 @@ function handleRunFinished(event: AGUIStreamEvent, accumulator: AGUIStreamAccumu
   );
 }
 
-function handleRunStarted(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleRunStarted(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const current = event as RunStartedEvent;
   const runId = resolveRunId(current);
   const threadId = resolveThreadId(current);
@@ -361,7 +465,10 @@ function handleRunStarted(event: AGUIStreamEvent, accumulator: AGUIStreamAccumul
   );
 }
 
-function handleStateDelta(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleStateDelta(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const current = event as StateDeltaEvent;
   accumulator.stateSnapshot = current.delta;
   return createStreamMessage(
@@ -381,7 +488,10 @@ function handleStateDelta(event: AGUIStreamEvent, accumulator: AGUIStreamAccumul
   );
 }
 
-function handleStateSnapshot(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleStateSnapshot(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const current = event as StateSnapshotEvent;
   accumulator.stateSnapshot = current.snapshot;
   return createStreamMessage(
@@ -401,7 +511,10 @@ function handleStateSnapshot(event: AGUIStreamEvent, accumulator: AGUIStreamAccu
   );
 }
 
-function handleStepFinished(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleStepFinished(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const current = event as StepFinishedEvent;
   const stepName = resolveStepName(current) ?? 'step';
   return createStreamMessage(
@@ -421,7 +534,10 @@ function handleStepFinished(event: AGUIStreamEvent, accumulator: AGUIStreamAccum
   );
 }
 
-function handleStepStarted(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleStepStarted(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const current = event as StepStartedEvent;
   const stepName = resolveStepName(current) ?? 'step';
   return createStreamMessage(
@@ -441,8 +557,11 @@ function handleStepStarted(event: AGUIStreamEvent, accumulator: AGUIStreamAccumu
   );
 }
 
-function handleTextContent(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
-  const messageId = resolveMessageId(event);
+function handleTextContent(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
+  const messageId = resolveCurrentMessageId(event, accumulator);
   if (!messageId) {
     return null;
   }
@@ -451,6 +570,7 @@ function handleTextContent(event: AGUIStreamEvent, accumulator: AGUIStreamAccumu
       ? mapAGUIRole(event.role)
       : undefined;
   const state = createOrGetMessageState(messageId, event, accumulator, role);
+  accumulator.currentMessageId = messageId;
   return createStreamMessage(
     state.role,
     resolveTimestamp(event.timestamp, state.createdTime),
@@ -459,12 +579,18 @@ function handleTextContent(event: AGUIStreamEvent, accumulator: AGUIStreamAccumu
   );
 }
 
-function handleTextMessageEnd(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleTextMessageEnd(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const messageId = resolveMessageId(event);
   if (!messageId) {
     return null;
   }
   const state = createOrGetMessageState(messageId, event, accumulator);
+  if (accumulator.currentMessageId === messageId) {
+    accumulator.currentMessageId = null;
+  }
   return createStreamMessage(
     state.role,
     resolveTimestamp(event.timestamp, state.createdTime),
@@ -482,21 +608,23 @@ function handleTextMessageEnd(event: AGUIStreamEvent, accumulator: AGUIStreamAcc
   );
 }
 
-function handleTextMessageStart(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleTextMessageStart(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const messageId = resolveMessageId(event);
   if (!messageId) {
     return null;
   }
   const role =
-    'role' in event && typeof event.role === 'string'
-      ? event.role
-      : undefined;
+    'role' in event && typeof event.role === 'string' ? event.role : undefined;
   const state = {
     conversationId: resolveConversationId(event, accumulator) ?? null,
     createdTime: resolveTimestamp(event.timestamp),
     role: mapAGUIRole(role),
   };
   accumulator.messages.set(messageId, state);
+  accumulator.currentMessageId = messageId;
   return createStreamMessage(
     state.role,
     resolveTimestamp(event.timestamp, state.createdTime),
@@ -514,12 +642,20 @@ function handleTextMessageStart(event: AGUIStreamEvent, accumulator: AGUIStreamA
   );
 }
 
-function handleToolCallArgs(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleToolCallArgs(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const current = event as ToolCallArgsEvent;
-  const state = createOrGetToolCallState(event, accumulator, resolveToolCallId(current));
+  const state = createOrGetToolCallState(
+    event,
+    accumulator,
+    resolveCurrentToolCallId(current, accumulator),
+  );
   if (!state) {
     return null;
   }
+  accumulator.currentToolCallId = state.toolCallId;
   return createStreamMessage(
     'assistant',
     resolveTimestamp(event.timestamp, state.createdTime),
@@ -530,7 +666,7 @@ function handleToolCallArgs(event: AGUIStreamEvent, accumulator: AGUIStreamAccum
         eventType: current.type,
         status: 'running',
         summary: state.toolCallName ?? state.toolCallId,
-        text: current.delta,
+        text: getDeltaFromEvent(current),
         title: '工具参数',
       }),
     ],
@@ -538,11 +674,21 @@ function handleToolCallArgs(event: AGUIStreamEvent, accumulator: AGUIStreamAccum
   );
 }
 
-function handleToolCallEnd(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleToolCallEnd(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const current = event as ToolCallEndEvent;
-  const state = createOrGetToolCallState(event, accumulator, resolveToolCallId(current));
+  const state = createOrGetToolCallState(
+    event,
+    accumulator,
+    resolveToolCallId(current),
+  );
   if (!state) {
     return null;
+  }
+  if (accumulator.currentToolCallId === state.toolCallId) {
+    accumulator.currentToolCallId = null;
   }
   return createStreamMessage(
     'assistant',
@@ -561,20 +707,37 @@ function handleToolCallEnd(event: AGUIStreamEvent, accumulator: AGUIStreamAccumu
   );
 }
 
-function handleToolCallResult(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleToolCallResult(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const current = event as ToolCallResultEvent;
-  const state = createOrGetToolCallState(event, accumulator, resolveToolCallId(current));
+  const state = createOrGetToolCallState(
+    event,
+    accumulator,
+    resolveToolCallId(current),
+  );
   if (!state) {
     return null;
   }
   const blocks: AIChatMessageBlock[] = [];
   const content = current.content.trim();
-  if (content) {
+  const toolResultBlocks = normalizeAGUIToolResultBlocks(content);
+  const hasExtractedFiles = toolResultBlocks.length > 0;
+  if (content && toolResultBlocks.length === 0) {
     blocks.push({ text: content, type: 'text' });
   }
+  blocks.push(...toolResultBlocks);
   blocks.unshift(
     createAGUIEventBlock({
-      data: current,
+      data: hasExtractedFiles
+        ? {
+            ...current,
+            content: undefined,
+            contentOmitted: true,
+            extractedFileCount: toolResultBlocks.length,
+          }
+        : current,
       eventKey: `tool-call:${state.toolCallId}`,
       eventType: current.type,
       status: 'success',
@@ -590,7 +753,10 @@ function handleToolCallResult(event: AGUIStreamEvent, accumulator: AGUIStreamAcc
   );
 }
 
-function handleToolCallStart(event: AGUIStreamEvent, accumulator: AGUIStreamAccumulator) {
+function handleToolCallStart(
+  event: AGUIStreamEvent,
+  accumulator: AGUIStreamAccumulator,
+) {
   const current = event as ToolCallStartEvent;
   const toolCallId = resolveToolCallId(current);
   const toolCallName = resolveToolCallName(current);
@@ -599,6 +765,7 @@ function handleToolCallStart(event: AGUIStreamEvent, accumulator: AGUIStreamAccu
   if (!state) {
     return null;
   }
+  accumulator.currentToolCallId = state.toolCallId;
   return createStreamMessage(
     'assistant',
     resolveTimestamp(event.timestamp, state.createdTime),
@@ -644,6 +811,7 @@ const AGUI_EVENT_HANDLERS: Record<string, AGUIEventHandler> = {
   THINKING_TEXT_MESSAGE_END: handleReasoningMessageEnd,
   THINKING_TEXT_MESSAGE_START: handleReasoningMessageStart,
   TOOL_CALL_ARGS: handleToolCallArgs,
+  TOOL_CALL_CHUNK: handleToolCallArgs,
   TOOL_CALL_END: handleToolCallEnd,
   TOOL_CALL_RESULT: handleToolCallResult,
   TOOL_CALL_START: handleToolCallStart,

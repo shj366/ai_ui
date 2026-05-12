@@ -32,8 +32,11 @@ type AGUIToolCallState = {
 
 export type AGUIStreamAccumulator = {
   buffer: string;
+  currentMessageId?: null | string;
+  currentReasoningMessageId?: null | string;
   currentRunId?: null | string;
   currentThreadId?: null | string;
+  currentToolCallId?: null | string;
   messages: Map<string, AGUIStreamMessageState>;
   stateSnapshot?: unknown;
   thinking?: AGUIThinkingState;
@@ -182,8 +185,11 @@ export function createStreamMessage(
 export function createAGUIStreamAccumulator(): AGUIStreamAccumulator {
   return {
     buffer: '',
+    currentMessageId: null,
+    currentReasoningMessageId: null,
     currentRunId: null,
     currentThreadId: null,
+    currentToolCallId: null,
     messages: new Map(),
     stateSnapshot: undefined,
     thinking: undefined,
@@ -193,7 +199,10 @@ export function createAGUIStreamAccumulator(): AGUIStreamAccumulator {
 
 export function clearAGUIStreamAccumulator(accumulator: AGUIStreamAccumulator) {
   accumulator.buffer = '';
+  accumulator.currentMessageId = null;
+  accumulator.currentReasoningMessageId = null;
   accumulator.currentRunId = null;
+  accumulator.currentToolCallId = null;
   accumulator.messages.clear();
   accumulator.stateSnapshot = undefined;
   accumulator.thinking = undefined;

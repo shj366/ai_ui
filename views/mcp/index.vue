@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { VbenFormProps } from '@vben/common-ui';
 
-import type { OnActionClickParams, VxeTableGridOptions } from '#/adapter/vxe-table';
+import type {
+  OnActionClickParams,
+  VxeTableGridOptions,
+} from '#/adapter/vxe-table';
 import type { AIMcpParams, AIMcpResult } from '#/plugins/ai/api';
 
 import { computed, ref } from 'vue';
@@ -14,7 +17,12 @@ import { message } from 'antdv-next';
 
 import { useVbenForm } from '#/adapter/form';
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
-import { createAIMcpApi, deleteAIMcpApi, getAIMcpListApi, updateAIMcpApi } from '#/plugins/ai/api';
+import {
+  createAIMcpApi,
+  deleteAIMcpApi,
+  getAIMcpListApi,
+  updateAIMcpApi,
+} from '#/plugins/ai/api';
 
 import {
   formatArgsInput,
@@ -178,9 +186,11 @@ const [Modal, modalApi] = useVbenModal({
         env: parseEnvInput(data.env, '环境变量'),
         args: parseArgsInput(data.args),
         headers: parseHeadersInput(data.headers, '请求头'),
+        include_instructions: Boolean(data.include_instructions),
         name: data.name,
         read_timeout: data.read_timeout,
         timeout: data.timeout,
+        tool_prefix: data.tool_prefix?.trim() || undefined,
         type: data.type,
         url: data.url?.trim() || undefined,
       };
@@ -220,7 +230,11 @@ const [Modal, modalApi] = useVbenModal({
           <MaterialSymbolsAdd class="size-5" />
           新增 MCP
         </VbenButton>
-        <VbenButton class="ml-2" variant="outline" @click="importModalApi.setData(null).open()">
+        <VbenButton
+          class="ml-2"
+          variant="outline"
+          @click="importModalApi.setData(null).open()"
+        >
           导入 JSON
         </VbenButton>
       </template>
@@ -228,12 +242,15 @@ const [Modal, modalApi] = useVbenModal({
     <Modal content-class="px-4 py-4 md:px-5 md:py-5" :title="modalTitle">
       <Form />
     </Modal>
-    <ImportModal content-class="px-4 py-4 md:px-5 md:py-5" title="从 JSON 导入 MCP">
+    <ImportModal
+      content-class="px-4 py-4 md:px-5 md:py-5"
+      title="从 JSON 导入 MCP"
+    >
       <div class="flex flex-col gap-4">
         <a-alert show-icon type="info">
           <template #message>
-            支持导入标准 MCP 配置 JSON，请从 MCP Servers 的介绍页面复制包含 mcpServers 的配置
-            JSON，并粘贴到输入框中
+            支持导入标准 MCP 配置 JSON，请从 MCP Servers 的介绍页面复制包含
+            mcpServers 的配置 JSON，并粘贴到输入框中
           </template>
         </a-alert>
         <a-textarea

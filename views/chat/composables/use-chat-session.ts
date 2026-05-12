@@ -225,7 +225,9 @@ export function useChatSession(options: UseChatSessionOptions) {
     await fetchConversations(true);
   }
 
-  async function togglePinConversation(conversation?: AIChatConversationResult) {
+  async function togglePinConversation(
+    conversation?: AIChatConversationResult,
+  ) {
     const targetConversation = conversation || activeConversation.value;
     if (!targetConversation) {
       return;
@@ -241,7 +243,10 @@ export function useChatSession(options: UseChatSessionOptions) {
   }
 
   async function closeRenameModalIfMatched(conversationId: string) {
-    if (options.renameConversationFormData.value?.conversation_id !== conversationId) {
+    if (
+      options.renameConversationFormData.value?.conversation_id !==
+      conversationId
+    ) {
       return;
     }
 
@@ -348,7 +353,11 @@ export function useChatSession(options: UseChatSessionOptions) {
   async function deleteMessageChain(item: ChatMessageItem) {
     const currentConversationId = activeConversationId.value;
 
-    if (!currentConversationId || item.message_id === undefined || item.message_id === null) {
+    if (
+      !currentConversationId ||
+      item.message_id === undefined ||
+      item.message_id === null
+    ) {
       return;
     }
 

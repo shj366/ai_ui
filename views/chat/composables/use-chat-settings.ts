@@ -8,6 +8,14 @@ import type {
 import { computed, ref, watch } from 'vue';
 
 type ChatGenerationType = NonNullable<AIChatComposerParams['generation_type']>;
+type ChatImageActionType = AIChatComposerParams['image_action'];
+type ChatImageAspectRatioType = AIChatComposerParams['image_aspect_ratio'];
+type ChatImageBackgroundType = AIChatComposerParams['image_background'];
+type ChatImageInputFidelityType = AIChatComposerParams['image_input_fidelity'];
+type ChatImageModerationType = AIChatComposerParams['image_moderation'];
+type ChatImageOutputFormatType = AIChatComposerParams['image_output_format'];
+type ChatImageQualityType = AIChatComposerParams['image_quality'];
+type ChatImageSizeType = AIChatComposerParams['image_size'];
 type ChatThinkingValue = AIChatComposerParams['thinking'];
 type ChatWebSearchType = NonNullable<AIChatComposerParams['web_search']>;
 interface ChatSessionScopedConfig {
@@ -30,7 +38,7 @@ const DEFAULT_CHAT_SESSION_SCOPED_CONFIG: Omit<
   parallelToolCalls: true,
   selectedMcpIds: [],
   thinking: undefined,
-  webSearch: 'builtin',
+  webSearch: 'off',
 };
 
 const GENERATION_TYPE_OPTIONS: Array<{
@@ -47,10 +55,15 @@ const WEB_SEARCH_OPTIONS: Array<{
   label: string;
   value: ChatWebSearchType;
 }> = [
+  { desc: '不主动启用搜索工具', label: '关闭联网', value: 'off' },
   { desc: '优先使用模型内置搜索能力', label: '内置搜索', value: 'builtin' },
   { desc: '使用 Exa 作为搜索来源', label: 'Exa', value: 'exa' },
   { desc: '使用 Tavily 作为搜索来源', label: 'Tavily', value: 'tavily' },
-  { desc: '使用 DuckDuckGo 作为搜索来源', label: 'DuckDuckGo', value: 'duckduckgo' },
+  {
+    desc: '使用 DuckDuckGo 作为搜索来源',
+    label: 'DuckDuckGo',
+    value: 'duckduckgo',
+  },
 ];
 
 const THINKING_OPTIONS: Array<{
@@ -59,9 +72,19 @@ const THINKING_OPTIONS: Array<{
   label: string;
   value: ChatThinkingValue;
 }> = [
-  { desc: '沿用模型默认思考行为', key: 'default', label: '默认', value: undefined },
+  {
+    desc: '沿用模型默认思考行为',
+    key: 'default',
+    label: '默认',
+    value: undefined,
+  },
   { desc: '显式关闭思考', key: 'off', label: '关闭', value: false },
-  { desc: '最轻量的思考强度', key: 'minimal', label: 'minimal', value: 'minimal' },
+  {
+    desc: '最轻量的思考强度',
+    key: 'minimal',
+    label: 'minimal',
+    value: 'minimal',
+  },
   { desc: '较低思考强度', key: 'low', label: 'low', value: 'low' },
   { desc: '平衡型思考强度', key: 'medium', label: 'medium', value: 'medium' },
   { desc: '较高思考强度', key: 'high', label: 'high', value: 'high' },
@@ -91,18 +114,29 @@ export function useChatSettings(options: UseChatSettingsOptions) {
   const presencePenalty = ref<number>();
   const frequencyPenalty = ref<number>();
   const generationType = ref<ChatGenerationType>('text');
+  const imageAction = ref<ChatImageActionType>(undefined);
+  const imageAspectRatio = ref<ChatImageAspectRatioType>(undefined);
+  const imageBackground = ref<ChatImageBackgroundType>(undefined);
+  const imageInputFidelity = ref<ChatImageInputFidelityType>(undefined);
+  const imageModel = ref('');
+  const imageModeration = ref<ChatImageModerationType>(undefined);
+  const imageOutputCompression = ref<number>();
+  const imageOutputFormat = ref<ChatImageOutputFormatType>(undefined);
+  const imagePartialImages = ref<number>();
+  const imageQuality = ref<ChatImageQualityType>(undefined);
+  const imageSize = ref<ChatImageSizeType>(undefined);
   const parallelToolCalls = ref(true);
   const thinking = ref<ChatThinkingValue>(undefined);
   const enableBuiltinTools = ref(true);
   const selectedMcpIds = ref<number[]>([]);
-  const webSearch = ref<ChatWebSearchType>('builtin');
+  const webSearch = ref<ChatWebSearchType>('off');
   const stopSequences = ref('');
   const extraHeaders = ref('');
   const extraBody = ref('');
   const logitBias = ref('');
-  const conversationSessionConfigs = ref<Record<string, ChatSessionScopedConfig>>(
-    {},
-  );
+  const conversationSessionConfigs = ref<
+    Record<string, ChatSessionScopedConfig>
+  >({});
 
   function resetGenerationSettings() {
     maxTokens.value = undefined;
@@ -115,6 +149,20 @@ export function useChatSettings(options: UseChatSettingsOptions) {
     seed.value = undefined;
     presencePenalty.value = undefined;
     frequencyPenalty.value = undefined;
+  }
+
+  function resetImageSettings() {
+    imageAction.value = undefined;
+    imageAspectRatio.value = undefined;
+    imageBackground.value = undefined;
+    imageInputFidelity.value = undefined;
+    imageModel.value = '';
+    imageModeration.value = undefined;
+    imageOutputCompression.value = undefined;
+    imageOutputFormat.value = undefined;
+    imagePartialImages.value = undefined;
+    imageQuality.value = undefined;
+    imageSize.value = undefined;
   }
 
   function resetToolingSettings() {
@@ -132,6 +180,7 @@ export function useChatSettings(options: UseChatSettingsOptions) {
   function resetModelSettings() {
     resetGenerationSettings();
     resetBehaviorSettings();
+    resetImageSettings();
     resetToolingSettings();
     resetPassthroughSettings();
   }
@@ -159,13 +208,16 @@ export function useChatSettings(options: UseChatSettingsOptions) {
     }
 
     generationType.value =
-      config.generationType ?? DEFAULT_CHAT_SESSION_SCOPED_CONFIG.generationType;
+      config.generationType ??
+      DEFAULT_CHAT_SESSION_SCOPED_CONFIG.generationType;
     parallelToolCalls.value =
-      config.parallelToolCalls ?? DEFAULT_CHAT_SESSION_SCOPED_CONFIG.parallelToolCalls;
+      config.parallelToolCalls ??
+      DEFAULT_CHAT_SESSION_SCOPED_CONFIG.parallelToolCalls;
     thinking.value =
       config.thinking ?? DEFAULT_CHAT_SESSION_SCOPED_CONFIG.thinking;
     enableBuiltinTools.value =
-      config.enableBuiltinTools ?? DEFAULT_CHAT_SESSION_SCOPED_CONFIG.enableBuiltinTools;
+      config.enableBuiltinTools ??
+      DEFAULT_CHAT_SESSION_SCOPED_CONFIG.enableBuiltinTools;
     selectedMcpIds.value = [...(config.selectedMcpIds ?? [])];
     webSearch.value =
       config.webSearch ?? DEFAULT_CHAT_SESSION_SCOPED_CONFIG.webSearch;
@@ -199,6 +251,22 @@ export function useChatSettings(options: UseChatSettingsOptions) {
     );
   }
 
+  function hasImageSettingsChanged() {
+    return Boolean(
+      imageAction.value !== undefined ||
+      imageAspectRatio.value !== undefined ||
+      imageBackground.value !== undefined ||
+      imageInputFidelity.value !== undefined ||
+      imageModel.value.trim() ||
+      imageModeration.value !== undefined ||
+      imageOutputCompression.value !== undefined ||
+      imageOutputFormat.value !== undefined ||
+      imagePartialImages.value !== undefined ||
+      imageQuality.value !== undefined ||
+      imageSize.value !== undefined,
+    );
+  }
+
   function hasToolingSettingsChanged() {
     return Boolean(
       parallelToolCalls.value !== true || enableBuiltinTools.value !== true,
@@ -218,6 +286,7 @@ export function useChatSettings(options: UseChatSettingsOptions) {
     return Boolean(
       hasGenerationSettingsChanged() ||
       hasBehaviorSettingsChanged() ||
+      hasImageSettingsChanged() ||
       hasToolingSettingsChanged() ||
       hasPassthroughSettingsChanged(),
     );
@@ -293,6 +362,17 @@ export function useChatSettings(options: UseChatSettingsOptions) {
     generationType,
     generationTypeButtonLabel,
     hasAdvancedSettings,
+    imageAction,
+    imageAspectRatio,
+    imageBackground,
+    imageInputFidelity,
+    imageModel,
+    imageModeration,
+    imageOutputCompression,
+    imageOutputFormat,
+    imagePartialImages,
+    imageQuality,
+    imageSize,
     logitBias,
     maxTokens,
     parallelToolCalls,

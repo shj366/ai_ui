@@ -20,7 +20,6 @@ import type {
   AGUIUserMessage,
 } from '#/plugins/ai/types/ag-ui';
 import type {
-  AIChatAttachmentType,
   AIChatMessageBlock,
   AIChatMessageDetail,
   AIMessageRoleType,
@@ -31,12 +30,13 @@ import {
   createAGUIBinaryFileBlock,
   createAGUIEventBlock,
   createAGUIInputSourceFileBlock,
+  normalizeAGUIToolResultBlocks,
 } from './block-mappers';
 import {
   AGUI_DEVELOPER_MESSAGE_EVENT_TYPE,
   AGUI_SYSTEM_MESSAGE_EVENT_TYPE,
 } from './block-mappers';
-import { isRecord } from './utils';
+import { isRecord, resolveMetadataFilename } from './utils';
 
 function isAGUIMessagesSnapshotEvent(
   value: unknown,
@@ -93,7 +93,10 @@ function resolveAGUIConversationMessageIndex(
   message: AGUIConversationMessage,
   fallbackIndex: number,
 ) {
-  if (typeof message.messageIndex === 'number' && Number.isFinite(message.messageIndex)) {
+  if (
+    typeof message.messageIndex === 'number' &&
+    Number.isFinite(message.messageIndex)
+  ) {
     return message.messageIndex;
   }
 
@@ -107,12 +110,7 @@ function resolveAGUIInputContentName(
     | ImageInputContent
     | VideoInputContent,
 ) {
-  const metadata = item.metadata;
-  if (!isRecord(metadata)) {
-    return null;
-  }
-
-  return typeof metadata.filename === 'string' ? metadata.filename : null;
+  return resolveMetadataFilename(item.metadata);
 }
 
 function normalizeAGUIUserContentBlocks(
@@ -197,71 +195,6 @@ function normalizeAGUIUserContentBlocks(
   }
 
   return blocks;
-}
-
-function normalizeAGUIToolResultBlocks(content: string): AIChatMessageBlock[] {
-  const text = content.trim();
-  if (!text) {
-    return [];
-  }
-
-  try {
-    const parsed = JSON.parse(text) as unknown;
-    const values = Array.isArray(parsed) ? parsed : [parsed];
-    const blocks: AIChatMessageBlock[] = [];
-
-    for (const value of values) {
-      if (!isRecord(value)) {
-        continue;
-      }
-
-      const url =
-        typeof value.url === 'string'
-          ? value.url
-          : (typeof value.value === 'string'
-            ? value.value
-            : null);
-
-      const mimeType =
-        typeof value.mimeType === 'string' ? value.mimeType : null;
-
-      if (!url && !mimeType) {
-        continue;
-      }
-
-      let fileType: AIChatAttachmentType | null = null;
-      const rawFileType = value.fileType;
-      if (typeof rawFileType === 'string') {
-        fileType = rawFileType as AIChatAttachmentType;
-      } else if (mimeType?.startsWith('audio/')) {
-        fileType = 'audio';
-      } else if (mimeType?.startsWith('image/')) {
-        fileType = 'image';
-      } else if (mimeType?.startsWith('video/')) {
-        fileType = 'video';
-      } else if (mimeType) {
-        fileType = 'document';
-      }
-
-      blocks.push(
-        createAGUIBinaryFileBlock({
-          fileType,
-          mimeType,
-          name:
-            typeof value.name === 'string'
-              ? value.name
-              : (typeof value.filename === 'string'
-                ? value.filename
-                : null),
-          url,
-        }),
-      );
-    }
-
-    return blocks;
-  } catch {
-    return [];
-  }
 }
 
 function normalizeAGUIAssistantToolCallBlocks(
@@ -380,12 +313,8 @@ function normalizeAGUIActivityMessageBlocks(
       return [
         createAGUIInputSourceFileBlock(
           file.type,
-          'source' in file
-            ? (file.source as InputContentSource | null)
-            : null,
-          isRecord(file.metadata) && typeof file.metadata.filename === 'string'
-            ? file.metadata.filename
-            : null,
+          'source' in file ? (file.source as InputContentSource | null) : null,
+          resolveMetadataFilename(file.metadata),
         ),
       ];
     }
@@ -394,10 +323,9 @@ function normalizeAGUIActivityMessageBlocks(
       const url =
         typeof file.url === 'string'
           ? file.url
-          : (typeof file.data === 'string' &&
-              mimeType
+          : typeof file.data === 'string' && mimeType
             ? `data:${mimeType};base64,${file.data}`
-            : null);
+            : null;
 
       return [
         createAGUIBinaryFileBlock({
@@ -438,7 +366,10 @@ function resolveAGUIConversationProviderId(
   message: AGUIConversationMessage,
   detail: AIChatConversationDetailResult,
 ) {
-  if (typeof message.providerId === 'number' && Number.isFinite(message.providerId)) {
+  if (
+    typeof message.providerId === 'number' &&
+    Number.isFinite(message.providerId)
+  ) {
     return message.providerId;
   }
 
@@ -500,22 +431,28 @@ function normalizeAGUIConversationMessage(
     }
     case 'tool': {
       role = 'assistant';
+      const toolResultBlocks = normalizeAGUIToolResultBlocks(message.content);
+      const hasExtractedFiles = toolResultBlocks.length > 0;
       blocks = [
         createAGUIEventBlock({
           data: {
-            content: message.content,
+            content: hasExtractedFiles ? undefined : message.content,
+            contentOmitted: hasExtractedFiles,
             encryptedValue: message.encryptedValue ?? null,
             error: message.error ?? null,
+            extractedFileCount: hasExtractedFiles
+              ? toolResultBlocks.length
+              : undefined,
             sourceRole: 'tool',
             toolCallId: message.toolCallId,
           },
           eventKey: `tool-result:${message.toolCallId}`,
           eventType: 'TOOL_CALL_RESULT',
           summary: message.toolCallId,
-          text: message.error ?? message.content,
+          text: message.error ?? (hasExtractedFiles ? '' : message.content),
           title: '工具结果',
         }),
-        ...normalizeAGUIToolResultBlocks(message.content),
+        ...toolResultBlocks,
       ];
       if (message.error) {
         messageType = 'error';
