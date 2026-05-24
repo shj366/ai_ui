@@ -27,14 +27,12 @@ import type {
 } from '#/plugins/ai/types/message';
 
 import {
+  AGUI_DEVELOPER_MESSAGE_EVENT_TYPE,
+  AGUI_SYSTEM_MESSAGE_EVENT_TYPE,
   createAGUIBinaryFileBlock,
   createAGUIEventBlock,
   createAGUIInputSourceFileBlock,
   normalizeAGUIToolResultBlocks,
-} from './block-mappers';
-import {
-  AGUI_DEVELOPER_MESSAGE_EVENT_TYPE,
-  AGUI_SYSTEM_MESSAGE_EVENT_TYPE,
 } from './block-mappers';
 import { isRecord, resolveMetadataFilename } from './utils';
 

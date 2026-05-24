@@ -16,7 +16,7 @@ import { XMarkdown } from '@antdv-next/x-markdown';
 import Latex from '@antdv-next/x-markdown/plugins/Latex';
 import { Skeleton } from 'antdv-next';
 
-import '@antdv-next/x-markdown/themes/index.css';
+import '@antdv-next/x-markdown/style.css';
 import '@antdv-next/x-markdown/themes/light.css';
 import '@antdv-next/x-markdown/themes/dark.css';
 

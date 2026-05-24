@@ -4,8 +4,9 @@ import type {
 } from '#/plugins/ai/api/chat';
 import type { AIChatProtocolName } from '#/plugins/ai/protocols';
 import type { ChatMessageItem } from '#/plugins/ai/runtime/message';
+import type { Ref } from 'vue';
 
-import { computed, ref, type Ref } from 'vue';
+import { computed, ref } from 'vue';
 
 import {
   clearAIChatConversationContextApi,
