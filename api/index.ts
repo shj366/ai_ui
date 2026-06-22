@@ -85,7 +85,7 @@ export interface AIMcpParams {
   description?: null | string;
   url?: null | string;
   headers?: null | Recordable<unknown>;
-  command: string;
+  command?: null | string;
   args?: null | string[];
   env?: null | Recordable<unknown>;
   timeout?: null | number;

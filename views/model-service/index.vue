@@ -39,7 +39,7 @@ function handleProviderSelect(providerId: number) {
     :right-width="80"
   >
     <template #left>
-      <div class="mr-2 h-full">
+      <div class="h-full">
         <ProviderPane
           :active-provider-id="activeProviderId"
           @providers-change="handleProvidersChange"

@@ -34,7 +34,7 @@ useInfiniteScroll(
 
 <template>
   <aside
-    class="mr-2 flex h-full min-h-0 flex-col overflow-hidden rounded-[var(--radius)] border border-border bg-card"
+    class="flex h-full min-h-0 flex-col overflow-hidden rounded-[var(--radius)] border border-border bg-card"
   >
     <div ref="scrollContainerRef" class="flex-1 overflow-y-auto p-3">
       <a-spin v-if="loading && items.length === 0" class="block py-10" />

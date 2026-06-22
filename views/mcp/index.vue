@@ -180,19 +180,21 @@ const [Modal, modalApi] = useVbenModal({
 
     try {
       const data = await formApi.getValues<AIMcpFormValues>();
+      const type = data.type ?? 0;
       const payload: AIMcpParams = {
-        command: data.command.trim(),
+        ...(type === 0 ? { command: data.command?.trim() ?? '' } : {}),
         description: data.description?.trim() || undefined,
-        env: parseEnvInput(data.env, '环境变量'),
-        args: parseArgsInput(data.args),
-        headers: parseHeadersInput(data.headers, '请求头'),
+        env: type === 0 ? parseEnvInput(data.env, '环境变量') : undefined,
+        args: type === 0 ? parseArgsInput(data.args) : undefined,
+        headers:
+          type === 0 ? undefined : parseHeadersInput(data.headers, '请求头'),
         include_instructions: Boolean(data.include_instructions),
         name: data.name,
         read_timeout: data.read_timeout,
         timeout: data.timeout,
         tool_prefix: data.tool_prefix?.trim() || undefined,
-        type: data.type,
-        url: data.url?.trim() || undefined,
+        type,
+        url: type === 0 ? undefined : data.url?.trim() || undefined,
       };
 
       await (formData.value?.id
