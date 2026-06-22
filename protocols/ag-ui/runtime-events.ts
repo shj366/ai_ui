@@ -723,18 +723,15 @@ function handleToolCallResult(
   const blocks: AIChatMessageBlock[] = [];
   const content = current.content.trim();
   const toolResultBlocks = normalizeAGUIToolResultBlocks(content);
-  const hasExtractedFiles = toolResultBlocks.length > 0;
-  if (content && toolResultBlocks.length === 0) {
-    blocks.push({ text: content, type: 'text' });
-  }
   blocks.push(...toolResultBlocks);
   blocks.unshift(
     createAGUIEventBlock({
-      data: hasExtractedFiles
+      data: content
         ? {
             ...current,
             content: undefined,
             contentOmitted: true,
+            contentPreview: content.slice(0, 2000),
             extractedFileCount: toolResultBlocks.length,
           }
         : current,

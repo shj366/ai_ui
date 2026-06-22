@@ -22,8 +22,7 @@
   "dependencies": {
     "@ag-ui/core": "catalog:",
     "@antdv-next/x": "catalog:",
-    "@antdv-next/x-markdown": "catalog:",
-    "@antdv-next/x-sdk": "catalog:",
+    "@antdv-next/x-markdown": "catalog:"
   }
 }
 ```
@@ -35,5 +34,4 @@ catalog:
   '@ag-ui/core': ^0.0.53
   '@antdv-next/x': ^1.0.2
   '@antdv-next/x-markdown': ^0.1.0
-  '@antdv-next/x-sdk': ^0.0.2
 ```

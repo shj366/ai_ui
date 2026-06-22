@@ -12,6 +12,27 @@ const TEXT_MESSAGE_EVENT_TYPES = new Set([
   'TEXT_MESSAGE_START',
 ]);
 
+const INTERNAL_LIFECYCLE_EVENT_TYPES = new Set([
+  'MESSAGES_SNAPSHOT',
+  'REASONING_END',
+  'REASONING_ENCRYPTED_VALUE',
+  'REASONING_MESSAGE_END',
+  'REASONING_MESSAGE_START',
+  'REASONING_START',
+  'RUN_FINISHED',
+  'RUN_STARTED',
+  'STATE_DELTA',
+  'STATE_SNAPSHOT',
+  'STEP_FINISHED',
+  'STEP_STARTED',
+  'TEXT_MESSAGE_END',
+  'TEXT_MESSAGE_START',
+  'THINKING_END',
+  'THINKING_START',
+  'THINKING_TEXT_MESSAGE_END',
+  'THINKING_TEXT_MESSAGE_START',
+]);
+
 const REASONING_EVENT_TYPES = new Set([
   'REASONING_END',
   'REASONING_MESSAGE_CHUNK',
@@ -119,6 +140,15 @@ export function getAGUIEventSourceItems(
   return items;
 }
 
+function hasEventType(
+  block: AIChatEventMessageBlock,
+  eventTypes: Set<string>,
+) {
+  return [block.event_type, ...(block.event_types ?? [])].some((eventType) =>
+    eventTypes.has(eventType),
+  );
+}
+
 export function shouldSuppressAGUIEventBlock(
   message: ChatMessageItem,
   block: AIChatEventMessageBlock,
@@ -128,6 +158,10 @@ export function shouldSuppressAGUIEventBlock(
   const hasReasoning = Boolean(
     getMessageTextContent(message, 'reasoning').trim(),
   );
+
+  if (hasEventType(block, INTERNAL_LIFECYCLE_EVENT_TYPES)) {
+    return true;
+  }
 
   if (hasMainText && TEXT_MESSAGE_EVENT_TYPES.has(eventType)) {
     return true;

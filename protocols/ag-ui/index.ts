@@ -7,10 +7,8 @@ import type {
 import type { AGUIStreamAccumulator } from './runtime-state';
 
 import type {
-  AIChatCompletionParams,
   AIChatConversationDetail,
   AIChatConversationDetailResult,
-  BuildChatCompletionRequestInput,
 } from '#/plugins/ai/api/chat';
 import type { AGUIStreamEvent } from '#/plugins/ai/types/ag-ui';
 
@@ -27,9 +25,6 @@ import {
 import {
   createAGUIStreamAccumulator,
 } from './runtime-state';
-import {
-  buildAGUIChatCompletionRequest,
-} from './serialize';
 import { isRecord } from './utils';
 
 function parseAGUIStreamEventFromSSE(
@@ -154,12 +149,6 @@ export function createAGUIProtocol(): AIChatProtocol<
 
 export function createAGUIProtocolDriver(): AIChatProtocolDriver {
   return {
-    buildChatCompletionRequest(
-      input: BuildChatCompletionRequestInput,
-      forwardedProps: AIChatCompletionParams['forwardedProps'],
-    ) {
-      return buildAGUIChatCompletionRequest(input, forwardedProps);
-    },
     createRuntimeProtocol: () => createAGUIProtocol(),
     getRenderableBlocks(message) {
       return getAGUIRenderableBlocks(message);

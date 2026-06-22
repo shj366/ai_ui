@@ -264,6 +264,9 @@ export function renderCodeBlock(
     h(CodeHighlighter, {
       content,
       language,
+      showCopyButton: true,
+      showLanguage: true,
+      showLineNumbers: content.split('\n').length > 6,
       showThemeToggle: false,
       theme: isDark ? 'dark' : 'light',
     }),
@@ -659,6 +662,7 @@ function buildMarkdownContentRenderer(isDark = false) {
           escapeRawHtml: false,
           openLinksInNewTab: true,
           paragraphTag: 'div',
+          protectCustomTagNewlines: true,
           ...(streaming
             ? {
                 streaming: {

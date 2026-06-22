@@ -20,7 +20,6 @@ import { useAccessStore } from '@vben/stores';
 
 import { requestClient } from '#/api/request';
 import {
-  buildAIChatCompletionRequest,
   normalizeAIChatConversationDetail,
 } from '#/plugins/ai/protocols';
 
@@ -190,7 +189,6 @@ export interface AIChatComposerParams {
   image_size?: AIChatImageSizeType | null;
   provider_id: number;
   model_id: string;
-  user_prompt?: null | string;
   max_tokens?: null | number;
   temperature?: null | number;
   top_p?: null | number;
@@ -261,7 +259,6 @@ export interface AIChatTransportRequest {
 
 export interface BuildChatCompletionRequestInput {
   conversationId?: null | string;
-  history: AIChatMessageDetail[];
   params: AIChatComposerParams;
   promptText?: string;
 }
@@ -329,13 +326,22 @@ function toForwardedProps(
 
 export function buildChatCompletionRequest(
   input: BuildChatCompletionRequestInput,
-  options: AIChatProtocolOptions = {},
 ): AIChatCompletionParams {
-  return buildAIChatCompletionRequest(
-    input,
-    toForwardedProps(input.params),
-    options.protocolName,
-  );
+  const promptText = input.promptText?.trim();
+
+  return {
+    conversationId: input.conversationId ?? undefined,
+    forwardedProps: toForwardedProps(input.params),
+    messages: promptText
+      ? [
+          {
+            content: promptText,
+            id: `user-draft-${Date.now()}`,
+            role: 'user',
+          },
+        ]
+      : [],
+  };
 }
 
 const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);

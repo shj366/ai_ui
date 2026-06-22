@@ -271,10 +271,11 @@ export function createDefaultRenderableBlocks(
   const blocks: AIChatRenderableBlock[] = [];
   const reasoningText = getMessageTextContent(message, 'reasoning');
   const text = getMessageTextContent(message, 'text');
-  const events = getMessageEventBlocks(message).filter(
+  const allEvents = getMessageEventBlocks(message);
+  const events = allEvents.filter(
     (block) => !options.shouldSuppressEventBlock?.(message, block),
   );
-  const sourceItems = collectSourceItems(events, options.getEventSourceItems);
+  const sourceItems = collectSourceItems(allEvents, options.getEventSourceItems);
   const inlineExtraction = extractMarkdownInlineFiles(text, message.id);
   const files = [...getMessageFileBlocks(message), ...inlineExtraction.files];
   const hasTextStarted = Boolean(text.trim());
@@ -286,6 +287,16 @@ export function createDefaultRenderableBlocks(
       key: `${message.id}-reasoning`,
       title: isReasoningActive ? '思考中' : '思考完成',
       type: 'reasoning',
+    });
+  }
+
+  if (events.length > 0) {
+    blocks.push({
+      items: events.map((event, index) =>
+        toRenderableEventItem(event, index),
+      ),
+      key: `${message.id}-events`,
+      type: 'events',
     });
   }
 
@@ -312,16 +323,6 @@ export function createDefaultRenderableBlocks(
       files,
       key: `${message.id}-files`,
       type: 'files',
-    });
-  }
-
-  if (events.length > 0) {
-    blocks.push({
-      items: events.map((event, index) =>
-        toRenderableEventItem(event, index),
-      ),
-      key: `${message.id}-events`,
-      type: 'events',
     });
   }
 

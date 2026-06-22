@@ -1,8 +1,6 @@
 import type {
-  AIChatCompletionParams,
   AIChatConversationDetail,
   AIChatConversationDetailResult,
-  BuildChatCompletionRequestInput,
 } from '../api/chat';
 import type {
   AIChatProviderMessage,
@@ -52,10 +50,6 @@ export interface AIChatProtocol<
 }
 
 export interface AIChatProtocolDriver {
-  buildChatCompletionRequest(
-    input: BuildChatCompletionRequestInput,
-    forwardedProps: AIChatCompletionParams['forwardedProps'],
-  ): AIChatCompletionParams;
   createRuntimeProtocol(): AIChatProtocol<
     AIChatProtocolChunk,
     AIChatProviderMessage
@@ -102,17 +96,6 @@ export function createAIChatProtocol(
   name: AIChatProtocolName = DEFAULT_AI_CHAT_PROTOCOL_NAME,
 ): AIChatProtocol<AIChatProtocolChunk, AIChatProviderMessage> {
   return createAIChatProtocolDriver(name).createRuntimeProtocol();
-}
-
-export function buildAIChatCompletionRequest(
-  input: BuildChatCompletionRequestInput,
-  forwardedProps: AIChatCompletionParams['forwardedProps'],
-  name: AIChatProtocolName = DEFAULT_AI_CHAT_PROTOCOL_NAME,
-): AIChatCompletionParams {
-  return createAIChatProtocolDriver(name).buildChatCompletionRequest(
-    input,
-    forwardedProps,
-  );
 }
 
 export function normalizeAIChatConversationDetail(

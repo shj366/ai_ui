@@ -4,6 +4,7 @@ import type {
   BubbleListProps,
   BubbleProps,
   FileCardProps,
+  ThoughtChainItemType,
 } from '@antdv-next/x';
 
 import type { Component, VNodeChild } from 'vue';
@@ -15,7 +16,10 @@ import type {
 
 import type { AIChatProtocolDriver } from '#/plugins/ai/protocols';
 import type { ChatMessageItem } from '#/plugins/ai/runtime/message';
-import type { AIChatFileMessageBlock } from '#/plugins/ai/types/message';
+import type {
+  AIChatEventMessageBlock,
+  AIChatFileMessageBlock,
+} from '#/plugins/ai/types/message';
 import type {
   AIChatRenderableBlock,
   AIChatRenderableEventItem,
@@ -31,9 +35,11 @@ import {
   FileCardList,
   Sources,
   Think,
+  ThoughtChain,
 } from '@antdv-next/x';
 
 import {
+  getMessageEventBlocks,
   getMessageFileBlocks,
   getMessageTextContent,
   parseDateLabel,
@@ -74,6 +80,44 @@ export interface CreateChatBubbleListRoleOptions {
 }
 
 const MAX_DATA_URL_PREVIEW_BYTES = 8 * 1024 * 1024;
+const REASONING_END_EVENT_TYPES = new Set([
+  'REASONING_END',
+  'REASONING_MESSAGE_END',
+  'THINKING_END',
+  'THINKING_TEXT_MESSAGE_END',
+]);
+const REASONING_RUNNING_EVENT_TYPES = new Set([
+  'REASONING_MESSAGE_CHUNK',
+  'REASONING_MESSAGE_CONTENT',
+  'REASONING_MESSAGE_START',
+  'REASONING_START',
+  'THINKING_START',
+  'THINKING_TEXT_MESSAGE_CONTENT',
+  'THINKING_TEXT_MESSAGE_START',
+]);
+const TOOL_CALL_ARG_EVENT_TYPES = new Set([
+  'TOOL_CALL_ARGS',
+  'TOOL_CALL_CHUNK',
+]);
+const TOOL_CALL_END_EVENT_TYPES = new Set(['TOOL_CALL_END']);
+const TOOL_CALL_EVENT_TYPES = new Set([
+  'TOOL_CALL_ARGS',
+  'TOOL_CALL_CHUNK',
+  'TOOL_CALL_END',
+  'TOOL_CALL_RESULT',
+  'TOOL_CALL_START',
+]);
+const TOOL_CALL_RESULT_EVENT_TYPES = new Set(['TOOL_CALL_RESULT']);
+const ACTIVITY_EVENT_TYPES = new Set(['ACTIVITY_DELTA', 'ACTIVITY_SNAPSHOT']);
+
+function eventBlockHasAnyType(
+  block: AIChatEventMessageBlock,
+  eventTypes: Set<string>,
+) {
+  return [block.event_type, ...(block.event_types ?? [])].some((eventType) =>
+    eventTypes.has(eventType),
+  );
+}
 
 function getBubbleListMessage(item: BubbleItemType) {
   const message = item.extraInfo?.message;
@@ -90,9 +134,32 @@ function getThinkingToggleLabel(message: ChatMessageItem) {
 }
 
 function isThinkingActive(message: ChatMessageItem) {
-  return Boolean(
-    message.streaming && !getMessageTextContent(message, 'text').trim(),
+  if (
+    !message.streaming ||
+    !getMessageTextContent(message, 'reasoning').trim() ||
+    getMessageTextContent(message, 'text').trim()
+  ) {
+    return false;
+  }
+
+  const events = getMessageEventBlocks(message);
+  const hasReasoningEnd = events.some((event) =>
+    eventBlockHasAnyType(event, REASONING_END_EVENT_TYPES),
   );
+  if (hasReasoningEnd) {
+    return false;
+  }
+
+  const hasRunningReasoningEvent = events.some(
+    (event) =>
+      event.status === 'running' &&
+      ((event.event_types ?? []).some((type) =>
+        REASONING_RUNNING_EVENT_TYPES.has(type),
+      ) ||
+        REASONING_RUNNING_EVENT_TYPES.has(event.event_type)),
+  );
+
+  return hasRunningReasoningEvent || !hasReasoningEnd;
 }
 
 function getReasoningMarkdownStreaming(
@@ -366,7 +433,7 @@ function renderEventContent(
 ): VNodeChild {
   const children: VNodeChild[] = [];
 
-  if (item.text?.trim()) {
+  if (item.status === 'error' && item.text?.trim()) {
     children.push(
       h(MarkdownContent, {
         content: item.text,
@@ -374,30 +441,12 @@ function renderEventContent(
     );
   }
 
-  const dataPreview = renderDataPreview(item.data, '事件数据', isDark);
+  const dataPreview =
+    item.status === 'error'
+      ? renderDataPreview(item.data, '错误详情', isDark)
+      : null;
   if (dataPreview) {
     children.push(dataPreview);
-  }
-
-  if (item.eventTypes?.length) {
-    children.push(
-      h(
-        'div',
-        {
-          class: 'flex flex-wrap gap-1 text-[11px] text-muted-foreground',
-        },
-        item.eventTypes.map((eventType) =>
-          h(
-            'span',
-            {
-              class:
-                'rounded-full border border-border/70 bg-background px-2 py-0.5',
-            },
-            eventType,
-          ),
-        ),
-      ),
-    );
   }
 
   if (children.length === 0) {
@@ -405,6 +454,175 @@ function renderEventContent(
   }
 
   return h('div', { class: 'min-w-0 space-y-2' }, children);
+}
+
+function eventItemHasAnyType(
+  item: AIChatRenderableEventItem,
+  eventTypes: Set<string>,
+) {
+  return [item.eventType, ...(item.eventTypes ?? [])].some((eventType) =>
+    eventTypes.has(eventType),
+  );
+}
+
+function toThoughtChainStatus(
+  status: AIChatRenderableEventItem['status'],
+): ThoughtChainItemType['status'] {
+  switch (status) {
+    case 'abort': {
+      return 'abort';
+    }
+    case 'error': {
+      return 'error';
+    }
+    case 'running': {
+      return 'loading';
+    }
+    case 'success': {
+      return 'success';
+    }
+    default: {
+      return undefined;
+    }
+  }
+}
+
+function getEventDisplayTitle(item: AIChatRenderableEventItem) {
+  switch (item.eventType) {
+    case 'TOOL_CALL_ARGS':
+    case 'TOOL_CALL_CHUNK': {
+      return '传入工具参数';
+    }
+    case 'TOOL_CALL_END': {
+      return '工具调用完成';
+    }
+    case 'TOOL_CALL_RESULT': {
+      return '读取工具结果';
+    }
+    case 'TOOL_CALL_START': {
+      return '调用工具';
+    }
+  }
+
+  if (eventItemHasAnyType(item, TOOL_CALL_END_EVENT_TYPES)) {
+    return '工具调用完成';
+  }
+
+  if (eventItemHasAnyType(item, TOOL_CALL_RESULT_EVENT_TYPES)) {
+    return '读取工具结果';
+  }
+
+  if (eventItemHasAnyType(item, TOOL_CALL_ARG_EVENT_TYPES)) {
+    return '传入工具参数';
+  }
+
+  if (eventItemHasAnyType(item, TOOL_CALL_EVENT_TYPES)) {
+    return '调用工具';
+  }
+
+  if (eventItemHasAnyType(item, ACTIVITY_EVENT_TYPES)) {
+    return '执行活动';
+  }
+
+  return item.title || '执行步骤';
+}
+
+function getEventDisplayDescription(item: AIChatRenderableEventItem) {
+  return item.summary || item.title;
+}
+
+function buildThoughtChainItem(
+  item: AIChatRenderableEventItem,
+  title: string,
+  status: ThoughtChainItemType['status'],
+  content?: VNodeChild,
+  keySuffix = '',
+): ThoughtChainItemType {
+  return {
+    blink: status === 'loading',
+    collapsible: Boolean(content),
+    content,
+    description: getEventDisplayDescription(item),
+    key: keySuffix ? `${item.key}-${keySuffix}` : item.key,
+    status,
+    title,
+  };
+}
+
+function getCompletedToolPhaseStatus(
+  item: AIChatRenderableEventItem,
+): ThoughtChainItemType['status'] {
+  if (item.status === 'abort' || item.status === 'error') {
+    return toThoughtChainStatus(item.status);
+  }
+
+  return 'success';
+}
+
+function getCurrentToolPhaseStatus(
+  item: AIChatRenderableEventItem,
+): ThoughtChainItemType['status'] {
+  return toThoughtChainStatus(item.status) ?? 'success';
+}
+
+function renderToolCallThoughtItems(
+  item: AIChatRenderableEventItem,
+  content: VNodeChild,
+) {
+  const hasArgs = eventItemHasAnyType(item, TOOL_CALL_ARG_EVENT_TYPES);
+  const hasResult = eventItemHasAnyType(item, TOOL_CALL_RESULT_EVENT_TYPES);
+  const hasEnd = eventItemHasAnyType(item, TOOL_CALL_END_EVENT_TYPES);
+  const currentStatus = getCurrentToolPhaseStatus(item);
+  const completedStatus = getCompletedToolPhaseStatus(item);
+  const items: ThoughtChainItemType[] = [];
+
+  items.push(
+    buildThoughtChainItem(
+      item,
+      '调用工具',
+      hasArgs || hasResult || hasEnd ? 'success' : currentStatus,
+      item.eventType === 'TOOL_CALL_START' ? content : undefined,
+      'start',
+    ),
+  );
+
+  if (hasArgs) {
+    items.push(
+      buildThoughtChainItem(
+        item,
+        '传入工具参数',
+        hasResult || hasEnd ? 'success' : currentStatus,
+        TOOL_CALL_ARG_EVENT_TYPES.has(item.eventType) ? content : undefined,
+        'args',
+      ),
+    );
+  }
+
+  if (hasResult) {
+    items.push(
+      buildThoughtChainItem(
+        item,
+        '读取工具结果',
+        hasEnd ? completedStatus : currentStatus,
+        item.eventType === 'TOOL_CALL_RESULT' ? content : undefined,
+        'result',
+      ),
+    );
+  }
+
+  if (hasEnd) {
+    items.push(
+      buildThoughtChainItem(
+        item,
+        '工具调用完成',
+        completedStatus,
+        item.eventType === 'TOOL_CALL_END' ? content : undefined,
+        'end',
+      ),
+    );
+  }
+
+  return items;
 }
 
 function renderMessageEvents(
@@ -416,33 +634,51 @@ function renderMessageEvents(
     return null;
   }
 
+  const thoughtItems = block.items.flatMap((item) => {
+    const content = renderEventContent(item, MarkdownContent, isDark);
+    const status = toThoughtChainStatus(item.status);
+
+    if (eventItemHasAnyType(item, TOOL_CALL_EVENT_TYPES)) {
+      return renderToolCallThoughtItems(item, content);
+    }
+
+    return [
+      buildThoughtChainItem(
+        item,
+        getEventDisplayTitle(item),
+        status,
+        content,
+      ),
+    ];
+  });
+
+  const expandedKeys = thoughtItems
+    .filter((item) => item.status === 'loading' || item.status === 'error')
+    .map((item) => item.key)
+    .filter((key): key is string => typeof key === 'string');
+
   return h(
     'div',
-    { key: block.key, class: 'min-w-0 max-w-full space-y-2' },
-    block.items.map((item) =>
+    {
+      key: block.key,
+      class:
+        'min-w-0 max-w-full rounded-2xl border border-border/70 bg-muted/20 px-3 py-3',
+    },
+    [
       h(
-        'details',
+        'div',
         {
           class:
-            'rounded-xl border border-border/70 bg-muted/20 px-3 py-2 text-xs',
-          key: item.key,
-          open: item.status === 'running' || item.status === 'error',
+            'mb-2 text-xs font-medium leading-none text-muted-foreground',
         },
-        [
-          h(
-            'summary',
-            {
-              class:
-                'cursor-pointer select-none font-medium text-muted-foreground',
-            },
-            [item.title, item.summary ? ` · ${item.summary}` : ''],
-          ),
-          h('div', { class: 'mt-2' }, [
-            renderEventContent(item, MarkdownContent, isDark),
-          ]),
-        ],
+        '执行过程',
       ),
-    ),
+      h(ThoughtChain, {
+        defaultExpandedKeys: expandedKeys,
+        items: thoughtItems,
+        line: 'dashed',
+      }),
+    ],
   );
 }
 
@@ -454,6 +690,28 @@ function renderUnsupportedBlock(
     reason: block.reason,
     title: block.title,
   });
+}
+
+function renderAssistantPending() {
+  return h(
+    'div',
+    {
+      class:
+        'inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/35 px-3 py-2 text-xs text-muted-foreground',
+    },
+    [
+      h('span', { class: 'size-1.5 animate-pulse rounded-full bg-current' }),
+      h(
+        'span',
+        { class: 'size-1.5 animate-pulse rounded-full bg-current delay-150' },
+      ),
+      h(
+        'span',
+        { class: 'size-1.5 animate-pulse rounded-full bg-current delay-300' },
+      ),
+      h('span', '正在组织回复'),
+    ],
+  );
 }
 
 function renderRenderableBlock(
@@ -563,21 +821,32 @@ export function renderChatMessageBubbleContent(
   }
 
   const renderableBlocks = options.protocolDriver.getRenderableBlocks(message);
+  const hasMainText = Boolean(text.trim());
+
+  if (renderableBlocks.length === 0 && message.streaming) {
+    return h('div', { class: 'min-w-0 max-w-full' }, [renderAssistantPending()]);
+  }
+
+  const children = renderableBlocks
+    .map((block) =>
+      renderRenderableBlock(
+        block,
+        message,
+        options,
+        MarkdownContent,
+        markdownStreaming,
+      ),
+    )
+    .filter(Boolean);
+
+  if (message.streaming && !hasMainText) {
+    children.push(renderAssistantPending());
+  }
 
   return h(
     'div',
     { class: 'min-w-0 max-w-full space-y-3' },
-    renderableBlocks
-      .map((block) =>
-        renderRenderableBlock(
-          block,
-          message,
-          options,
-          MarkdownContent,
-          markdownStreaming,
-        ),
-      )
-      .filter(Boolean),
+    children,
   );
 }
 

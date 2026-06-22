@@ -117,7 +117,6 @@ const {
 
 const {
   abort: abortTransientRequest,
-  chatProvider,
   isRequesting,
   messages: transientMessagesState,
   onRequest: onTransientRequest,
@@ -581,10 +580,8 @@ async function submitChat(
       ...(chatMode === 'edit' && hasEditingMessageId
         ? {
             edit_message_id: editingMessageId,
-            user_prompt: submittedPromptText,
           }
         : {}),
-      ...(chatMode === 'create' ? { user_prompt: submittedPromptText } : {}),
       ...(chatMode === 'regenerate' && regenerateMessageId !== undefined
         ? { regenerate_message_id: regenerateMessageId }
         : {}),
@@ -639,18 +636,12 @@ async function submitChat(
     draftConversationTitle.value = submittedTitle;
   }
   autoFollowMessageScroll.value = true;
-  const completionRequest = buildChatCompletionRequest(
-    {
-      conversationId: targetConversationId,
-      history: activeMessages.value,
-      params: payload,
-      promptText:
-        regenerateMessageId === undefined ? submittedPromptText : undefined,
-    },
-    {
-      protocolName: currentChatProtocolOptions.protocolName,
-    },
-  );
+  const completionRequest = buildChatCompletionRequest({
+    conversationId: targetConversationId,
+    params: payload,
+    promptText:
+      regenerateMessageId === undefined ? submittedPromptText : undefined,
+  });
 
   transientRequestError.value = null;
   setTransientMessages([]);
@@ -683,8 +674,7 @@ async function submitChat(
               : 'regenerate-from-response',
         };
 
-  onTransientRequest(requestParams);
-  await chatProvider.request.asyncHandler;
+  await onTransientRequest(requestParams);
 
   let streamedConversationId = targetConversationId;
   for (
@@ -780,6 +770,10 @@ const transientMessages = computed<ChatMessageItem[]>(() => {
 function shouldRenderChatMessage(message: ChatMessageItem) {
   if (message.message_type === 'error') {
     return Boolean(getMessageTextContent(message, 'text').trim());
+  }
+
+  if (message.role === 'assistant' && message.streaming) {
+    return true;
   }
 
   return currentChatProtocol.getRenderableBlocks(message).length > 0;
