@@ -346,8 +346,16 @@ function toAGUIInputMessages(
   input: BuildChatCompletionRequestInput,
 ): AIChatCompletionParams['messages'] {
   const messages: AIChatCompletionParams['messages'] = [];
+  const historyMessages = [...input.history];
 
-  for (const historyMessage of input.history) {
+  while (
+    historyMessages.length > 0 &&
+    historyMessages[historyMessages.length - 1]?.role !== 'user'
+  ) {
+    historyMessages.pop();
+  }
+
+  for (const historyMessage of historyMessages) {
     if (historyMessage.role === 'user') {
       const content = toAGUIUserContent(historyMessage);
       if (!content) {
