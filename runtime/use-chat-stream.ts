@@ -1,18 +1,14 @@
 import type {
+  AIChatCompletionParams,
+  AIChatRegenerateParams,
+  AIChatTransportMode,
+} from '../api/chat';
+import type {
   AIChatProtocol,
   AIChatProtocolChunk,
   AIChatProtocolName,
 } from '../protocols/factory';
-import type {
-  AIChatProviderMessage,
-  ChatTransientStatus,
-} from './message';
-
-import type {
-  AIChatCompletionParams,
-  AIChatRegenerateParams,
-  AIChatTransportMode,
-} from '#/plugins/ai/api/chat';
+import type { AIChatProviderMessage, ChatTransientStatus } from './message';
 
 import { ref } from 'vue';
 
@@ -21,8 +17,7 @@ import {
   readAIChatErrorMessage,
   resolveAIChatApiUrl,
   resolveAIChatTransportUrl,
-} from '#/plugins/ai/api/chat';
-
+} from '../api/chat';
 import { createAIChatProtocol } from '../protocols';
 import { buildMessageId, createProviderSeedMessage } from './message';
 
@@ -143,12 +138,10 @@ function useChatStream(
   let abortController: AbortController | null = null;
   let protocolState = protocol.createState();
   let requestId = 0;
-  let pendingAssistantUpdate:
-    | {
-        message: AIChatProviderMessage;
-        status: ChatTransientStatus;
-      }
-    | null = null;
+  let pendingAssistantUpdate: null | {
+    message: AIChatProviderMessage;
+    status: ChatTransientStatus;
+  } = null;
   let renderTimer: ReturnType<typeof setTimeout> | undefined;
   let lastAssistantRenderAt = 0;
   let hasRenderedStreamUpdate = false;
@@ -247,7 +240,9 @@ function useChatStream(
     lastAssistantRenderAt = Date.now();
     hasRenderedStreamUpdate = false;
     messages.value = [
-      ...(requestParams.localMessages ?? []).map(createLocalMessageInfo),
+      ...(requestParams.localMessages ?? []).map((message, index) =>
+        createLocalMessageInfo(message, index),
+      ),
       createAssistantLoadingMessageInfo(),
     ];
     currentAssistantMessage = messages.value.at(-1)?.message;

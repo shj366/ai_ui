@@ -6,22 +6,23 @@ import type {
   SuggestionItem,
 } from '@antdv-next/x';
 
-import type { VbenFormSchema } from '#/adapter/form';
 import type {
   AIMcpResult,
   AIModelResult,
   AIProviderResult,
   AIQuickPhraseResult,
-} from '#/plugins/ai/api';
+} from '../../api';
 import type {
   AIChatComposerParams,
   AIChatConversationResult,
-} from '#/plugins/ai/api/chat';
+} from '../../api/chat';
 import type {
   AIChatProviderMessage,
   ChatMessageItem,
-} from '#/plugins/ai/runtime/message';
-import type { AIChatProviderRequest } from '#/plugins/ai/runtime/use-chat-stream';
+} from '../../runtime/message';
+import type { AIChatProviderRequest } from '../../runtime/use-chat-stream';
+
+import type { VbenFormSchema } from '#/adapter/form';
 
 import {
   computed,
@@ -40,21 +41,22 @@ import { BubbleList, Suggestion, Welcome } from '@antdv-next/x';
 import { message } from 'antdv-next';
 
 import { useVbenForm } from '#/adapter/form';
+
 import {
   getAllAIMcpApi,
   getAllAIModelApi,
   getAllAIProviderApi,
   getAllAIQuickPhraseApi,
-} from '#/plugins/ai/api';
+} from '../../api';
 import {
   buildChatCompletionRequest,
   updateAIChatConversationApi,
   updateAIChatMessageApi,
-} from '#/plugins/ai/api/chat';
+} from '../../api/chat';
 import {
   createAIChatProtocolDriver,
   DEFAULT_AI_CHAT_PROTOCOL_NAME,
-} from '#/plugins/ai/protocols';
+} from '../../protocols';
 import {
   buildTransientMessageItems,
   createProviderUserMessage,
@@ -64,9 +66,8 @@ import {
   parseDateLabel,
   parseJsonField,
   replaceMessageTextBlocks,
-} from '#/plugins/ai/runtime/message';
-import { useAIChatStream } from '#/plugins/ai/runtime/use-chat-stream';
-
+} from '../../runtime/message';
+import { useAIChatStream } from '../../runtime/use-chat-stream';
 import {
   buildConversationSidebarItems,
   createConversationSidebarMenu,
@@ -781,7 +782,7 @@ function shouldRenderChatMessage(message: ChatMessageItem) {
 
 const displayMessages = computed<ChatMessageItem[]>(() => {
   return [...activeMessages.value, ...transientMessages.value].filter(
-    shouldRenderChatMessage,
+    (message) => shouldRenderChatMessage(message),
   );
 });
 

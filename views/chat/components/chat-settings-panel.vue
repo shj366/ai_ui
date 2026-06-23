@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AIChatGenerationType } from '#/plugins/ai/api/chat';
+import type { AIChatGenerationType } from '../../../api/chat';
 
 import { computed, ref, watch } from 'vue';
 

@@ -1,0 +1,12 @@
+{
+  "name": "@fba-ui/ai",
+  "version": "5.7.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@ag-ui/core": "^0.0.53",
+    "@antdv-next/x": "^1.1.1",
+    "@antdv-next/x-markdown": "^0.1.0",
+    "@antdv-next/x-sdk": "^0.0.2"
+  }
+}

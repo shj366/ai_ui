@@ -9,21 +9,20 @@ import type {
 
 import type { Component, VNodeChild } from 'vue';
 
+import type { AIChatProtocolDriver } from '../../../protocols';
+import type { ChatMessageItem } from '../../../runtime/message';
+import type {
+  AIChatEventMessageBlock,
+  AIChatFileMessageBlock,
+} from '../../../types/message';
+import type {
+  AIChatRenderableBlock,
+  AIChatRenderableEventItem,
+} from '../../../types/render';
 import type {
   MarkdownSourceItems,
   MarkdownStreamingState,
 } from '../renderers/markdown-content';
-
-import type { AIChatProtocolDriver } from '#/plugins/ai/protocols';
-import type { ChatMessageItem } from '#/plugins/ai/runtime/message';
-import type {
-  AIChatEventMessageBlock,
-  AIChatFileMessageBlock,
-} from '#/plugins/ai/types/message';
-import type {
-  AIChatRenderableBlock,
-  AIChatRenderableEventItem,
-} from '#/plugins/ai/types/render';
 
 import { h, resolveComponent } from 'vue';
 
@@ -43,8 +42,7 @@ import {
   getMessageFileBlocks,
   getMessageTextContent,
   parseDateLabel,
-} from '#/plugins/ai/runtime/message';
-
+} from '../../../runtime/message';
 import { AIJsonPreview } from '../renderers/custom/json-preview';
 import { AIUnsupportedBlock } from '../renderers/custom/unsupported-block';
 import {
@@ -326,7 +324,8 @@ function toMessageFileCard(
   const fileUrl = typeof file.url === 'string' ? file.url : undefined;
   const dataUrlInfo = getDataUrlInfo(fileUrl);
   const dataUrl = Boolean(dataUrlInfo);
-  const previewableDataUrl = dataUrl && isPreviewableDataUrlFile(type, dataUrlInfo);
+  const previewableDataUrl =
+    dataUrl && isPreviewableDataUrlFile(type, dataUrlInfo);
   const shouldDeferMedia = Boolean(message.streaming && dataUrl);
   const title =
     file.name ||
@@ -395,7 +394,6 @@ function renderMessageFiles(
   ]);
 }
 
-
 function renderInlineSourcePanel(sourceItems: MarkdownSourceItems) {
   if (sourceItems.length === 0) {
     return null;
@@ -408,7 +406,6 @@ function renderInlineSourcePanel(sourceItems: MarkdownSourceItems) {
     title: `来源 ${sourceItems.length}`,
   });
 }
-
 
 function renderDataPreview(
   data: unknown,
@@ -643,12 +640,7 @@ function renderMessageEvents(
     }
 
     return [
-      buildThoughtChainItem(
-        item,
-        getEventDisplayTitle(item),
-        status,
-        content,
-      ),
+      buildThoughtChainItem(item, getEventDisplayTitle(item), status, content),
     ];
   });
 
@@ -668,8 +660,7 @@ function renderMessageEvents(
       h(
         'div',
         {
-          class:
-            'mb-2 text-xs font-medium leading-none text-muted-foreground',
+          class: 'mb-2 text-xs font-medium leading-none text-muted-foreground',
         },
         '执行过程',
       ),
@@ -701,14 +692,12 @@ function renderAssistantPending() {
     },
     [
       h('span', { class: 'size-1.5 animate-pulse rounded-full bg-current' }),
-      h(
-        'span',
-        { class: 'size-1.5 animate-pulse rounded-full bg-current delay-150' },
-      ),
-      h(
-        'span',
-        { class: 'size-1.5 animate-pulse rounded-full bg-current delay-300' },
-      ),
+      h('span', {
+        class: 'size-1.5 animate-pulse rounded-full bg-current delay-150',
+      }),
+      h('span', {
+        class: 'size-1.5 animate-pulse rounded-full bg-current delay-300',
+      }),
       h('span', '正在组织回复'),
     ],
   );
@@ -727,7 +716,11 @@ function renderRenderableBlock(
   switch (block.type) {
     case 'code': {
       return h('div', { key: block.key }, [
-        renderCodeBlock(block.content, block.language ?? 'text', options.isDark),
+        renderCodeBlock(
+          block.content,
+          block.language ?? 'text',
+          options.isDark,
+        ),
       ]);
     }
     case 'events': {
@@ -824,7 +817,9 @@ export function renderChatMessageBubbleContent(
   const hasMainText = Boolean(text.trim());
 
   if (renderableBlocks.length === 0 && message.streaming) {
-    return h('div', { class: 'min-w-0 max-w-full' }, [renderAssistantPending()]);
+    return h('div', { class: 'min-w-0 max-w-full' }, [
+      renderAssistantPending(),
+    ]);
   }
 
   const children = renderableBlocks
@@ -843,11 +838,7 @@ export function renderChatMessageBubbleContent(
     children.push(renderAssistantPending());
   }
 
-  return h(
-    'div',
-    { class: 'min-w-0 max-w-full space-y-3' },
-    children,
-  );
+  return h('div', { class: 'min-w-0 max-w-full space-y-3' }, children);
 }
 
 function renderMessageHeader(

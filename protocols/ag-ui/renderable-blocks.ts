@@ -1,8 +1,7 @@
-import type { ChatMessageItem } from '#/plugins/ai/runtime/message';
-import type { AIChatRenderableBlock } from '#/plugins/ai/types/render';
+import type { ChatMessageItem } from '../../runtime/message';
+import type { AIChatRenderableBlock } from '../../types/render';
 
-import { createDefaultRenderableBlocks } from '#/plugins/ai/runtime/renderable-blocks';
-
+import { createDefaultRenderableBlocks } from '../../runtime/renderable-blocks';
 import {
   getAGUIEventSourceItems,
   shouldSuppressAGUIEventBlock,

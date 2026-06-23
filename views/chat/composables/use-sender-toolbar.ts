@@ -6,13 +6,13 @@ import type {
   AIChatComposerParams,
   AIMcpResult,
   AIQuickPhraseResult,
-} from '#/plugins/ai/api';
+} from '../../../api';
 
 import { h, ref, resolveComponent } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 
-import { getAllAIQuickPhraseApi } from '#/plugins/ai/api';
+import { getAllAIQuickPhraseApi } from '../../../api';
 
 interface SenderToolbarOption {
   desc?: string;
@@ -216,12 +216,12 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
       selected?: boolean;
     },
   ) {
-    const icon =
-      params.selected === undefined
-        ? params.icon
-        : (params.selected
-          ? 'mdi:check-circle'
-          : (params.icon ?? 'mdi:circle-outline'));
+    let icon = params.icon;
+    if (params.selected === true) {
+      icon = 'mdi:check-circle';
+    } else if (params.selected === false) {
+      icon = params.icon ?? 'mdi:circle-outline';
+    }
 
     return h(
       aButton,

@@ -35,7 +35,10 @@ export function normalizeAIChatEventBlock(
     data: block.data,
     event_key: block.event_key,
     event_type: block.event_type,
-    event_types: uniqueAIChatEventTypes(block.event_types ?? [], block.event_type),
+    event_types: uniqueAIChatEventTypes(
+      block.event_types ?? [],
+      block.event_type,
+    ),
     status: block.status ?? 'info',
     summary: block.summary ?? '',
     text: block.text ?? '',
@@ -220,7 +223,9 @@ export function normalizeMessage(
   activeConversationId?: null | string,
 ): ChatMessageItem {
   return {
-    blocks: (item.blocks ?? []).map((block) => normalizeAIChatMessageBlock(block)),
+    blocks: (item.blocks ?? []).map((block) =>
+      normalizeAIChatMessageBlock(block),
+    ),
     conversation_id: item.conversation_id ?? activeConversationId ?? null,
     created_time: item.created_time,
     id: buildMessageId(
@@ -290,7 +295,11 @@ function shouldMergeAssistantMessages(
   current: ChatMessageItem | undefined,
   incoming: ChatMessageItem,
 ) {
-  if (!current || current.role !== 'assistant' || incoming.role !== 'assistant') {
+  if (
+    !current ||
+    current.role !== 'assistant' ||
+    incoming.role !== 'assistant'
+  ) {
     return false;
   }
 
@@ -310,7 +319,11 @@ function shouldMergeAssistantMessages(
     return false;
   }
 
-  if (current.model_id && incoming.model_id && current.model_id !== incoming.model_id) {
+  if (
+    current.model_id &&
+    incoming.model_id &&
+    current.model_id !== incoming.model_id
+  ) {
     return false;
   }
 
@@ -334,7 +347,8 @@ function mergeChatMessageItems(
   return {
     ...incoming,
     blocks: mergeMessageBlocks(current.blocks ?? [], incoming.blocks ?? []),
-    conversation_id: incoming.conversation_id ?? current.conversation_id ?? null,
+    conversation_id:
+      incoming.conversation_id ?? current.conversation_id ?? null,
     created_time: current.created_time || incoming.created_time,
     id: incoming.id || current.id,
     message_id: incoming.message_id ?? current.message_id ?? null,
@@ -380,9 +394,13 @@ export function mergeMessageBlocks(
   currentBlocks: AIChatMessageBlock[],
   incomingBlocks: AIChatMessageBlock[],
 ) {
-  const merged = currentBlocks.map((block) => normalizeAIChatMessageBlock(block));
+  const merged = currentBlocks.map((block) =>
+    normalizeAIChatMessageBlock(block),
+  );
 
-  for (const incoming of incomingBlocks.map((block) => normalizeAIChatMessageBlock(block))) {
+  for (const incoming of incomingBlocks.map((block) =>
+    normalizeAIChatMessageBlock(block),
+  )) {
     const index = merged.findIndex(
       (block) => getBlockMergeKey(block) === getBlockMergeKey(incoming),
     );
@@ -429,7 +447,9 @@ export function mergeMessageBlocks(
       continue;
     }
 
-    const previous = merged[index] as AIChatReasoningMessageBlock | AIChatTextMessageBlock;
+    const previous = merged[index] as
+      | AIChatReasoningMessageBlock
+      | AIChatTextMessageBlock;
     merged[index] = normalizeAIChatTextLikeBlock({
       ...previous,
       text: mergeModelContent(previous.text ?? '', incoming.text ?? ''),
@@ -447,8 +467,12 @@ export function mergeStreamMessage(
   return {
     ...incoming,
     blocks: mergeMessageBlocks(current?.blocks ?? [], incoming.blocks),
-    conversation_id: incoming.conversation_id ?? current?.conversation_id ?? null,
-    created_time: incoming.created_time || current?.created_time || new Date().toISOString(),
+    conversation_id:
+      incoming.conversation_id ?? current?.conversation_id ?? null,
+    created_time:
+      incoming.created_time ||
+      current?.created_time ||
+      new Date().toISOString(),
     message_id: incoming.message_id ?? current?.message_id,
     message_type: incoming.message_type ?? current?.message_type ?? 'normal',
     model_id: incoming.model_id ?? current?.model_id ?? null,
@@ -525,14 +549,16 @@ export function buildTransientMessageItems(
     return [];
   }
 
-  return normalizeProviderMessage(providerMessage, fallbackIndex).map((item) => {
-    const nextItem = applyTransientEventBlockStatus(item, status);
+  return normalizeProviderMessage(providerMessage, fallbackIndex).map(
+    (item) => {
+      const nextItem = applyTransientEventBlockStatus(item, status);
 
-    return {
-      ...nextItem,
-      streaming:
-        nextItem.role === 'assistant' &&
-        (status === 'loading' || status === 'updating'),
-    };
-  });
+      return {
+        ...nextItem,
+        streaming:
+          nextItem.role === 'assistant' &&
+          (status === 'loading' || status === 'updating'),
+      };
+    },
+  );
 }

@@ -3,7 +3,7 @@ name: Plugin Release
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
 
 jobs:
   update-submodule:

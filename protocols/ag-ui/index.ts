@@ -1,16 +1,15 @@
+import type {
+  AIChatConversationDetail,
+  AIChatConversationDetailResult,
+} from '../../api/chat';
 import type { AIChatProviderMessage } from '../../runtime/message';
+import type { AGUIStreamEvent } from '../../types/ag-ui';
 import type {
   AIChatProtocol,
   AIChatProtocolChunk,
   AIChatProtocolDriver,
 } from '../factory';
 import type { AGUIStreamAccumulator } from './runtime-state';
-
-import type {
-  AIChatConversationDetail,
-  AIChatConversationDetailResult,
-} from '#/plugins/ai/api/chat';
-import type { AGUIStreamEvent } from '#/plugins/ai/types/ag-ui';
 
 import {
   createProviderSeedMessage,
@@ -19,17 +18,11 @@ import {
 import { AG_UI_AI_CHAT_PROTOCOL_NAME } from '../factory';
 import { normalizeAGUIConversationDetail } from './deserialize';
 import { getAGUIRenderableBlocks } from './renderable-blocks';
-import {
-  toAIChatMessageFromAGUIEvent,
-} from './runtime-events';
-import {
-  createAGUIStreamAccumulator,
-} from './runtime-state';
+import { toAIChatMessageFromAGUIEvent } from './runtime-events';
+import { createAGUIStreamAccumulator } from './runtime-state';
 import { isRecord } from './utils';
 
-function parseAGUIStreamEventFromSSE(
-  data: unknown,
-): AGUIStreamEvent | null {
+function parseAGUIStreamEventFromSSE(data: unknown): AGUIStreamEvent | null {
   if (isRecord(data) && typeof data.type === 'string') {
     return data as AGUIStreamEvent;
   }

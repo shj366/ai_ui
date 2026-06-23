@@ -12,7 +12,7 @@ import type {
   UserMessage,
 } from '@ag-ui/core';
 
-import type { AIMessageType } from '#/plugins/ai/types/message';
+import type { AIMessageType } from './message';
 
 interface AGUIMessageMetadata {
   content?: unknown;

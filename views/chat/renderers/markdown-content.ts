@@ -7,7 +7,7 @@ import type {
   VNodeArrayChildren,
 } from 'vue';
 
-import type { ChatMessageItem } from '#/plugins/ai/runtime/message';
+import type { ChatMessageItem } from '../../../runtime/message';
 
 import { defineComponent, h } from 'vue';
 

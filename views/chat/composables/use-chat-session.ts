@@ -1,11 +1,13 @@
+import type { Ref } from 'vue';
+
 import type {
   AIChatConversationDetail,
   AIChatConversationResult,
-} from '#/plugins/ai/api/chat';
-import type { AIChatProtocolName } from '#/plugins/ai/protocols';
-import type { ChatMessageItem } from '#/plugins/ai/runtime/message';
+} from '../../../api/chat';
+import type { AIChatProtocolName } from '../../../protocols';
+import type { ChatMessageItem } from '../../../runtime/message';
 
-import { computed, ref, type Ref } from 'vue';
+import { computed, ref } from 'vue';
 
 import {
   clearAIChatConversationContextApi,
@@ -15,11 +17,11 @@ import {
   getAIChatConversationDetailApi,
   getRecentAIChatConversationsApi,
   pinAIChatConversationApi,
-} from '#/plugins/ai/api/chat';
+} from '../../../api/chat';
 import {
   mergeAdjacentAssistantMessages,
   normalizeMessage,
-} from '#/plugins/ai/runtime/message';
+} from '../../../runtime/message';
 
 interface UseChatSessionOptions {
   autoFollowMessageScroll: Ref<boolean>;

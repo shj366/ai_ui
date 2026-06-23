@@ -1,7 +1,7 @@
 import type { ConversationsProps } from '@antdv-next/x';
 import type { MenuItemType } from 'antdv-next';
 
-import type { AIChatConversationResult } from '#/plugins/ai/api/chat';
+import type { AIChatConversationResult } from '../../../api/chat';
 
 import { h } from 'vue';
 

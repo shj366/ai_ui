@@ -23,7 +23,11 @@ export const AIUnsupportedBlock = defineComponent({
         [
           h('div', { class: 'font-medium' }, props.title),
           props.reason
-            ? h('div', { class: 'mt-1 text-xs text-muted-foreground' }, props.reason)
+            ? h(
+                'div',
+                { class: 'mt-1 text-xs text-muted-foreground' },
+                props.reason,
+              )
             : null,
         ],
       );

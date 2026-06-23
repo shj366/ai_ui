@@ -1,6 +1,7 @@
+import type { AIMcpParams, AIMcpResult } from '../../api';
+
 import type { VbenFormSchema } from '#/adapter/form';
 import type { OnActionClickFn, VxeGridProps } from '#/adapter/vxe-table';
-import type { AIMcpParams, AIMcpResult } from '#/plugins/ai/api';
 
 import { $t } from '@vben/locales';
 

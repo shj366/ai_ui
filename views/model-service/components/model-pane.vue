@@ -1,16 +1,17 @@
 <script setup lang="ts">
-import type { VbenFormProps } from '#/adapter/form';
-import type {
-  OnActionClickParams,
-  VxeTableGridOptions,
-} from '#/adapter/vxe-table';
 import type {
   AIBatchCreateModelsParams,
   AIModelParams,
   AIModelResult,
   AIProviderModelResult,
   AIProviderResult,
-} from '#/plugins/ai/api';
+} from '../../../api';
+
+import type { VbenFormProps } from '#/adapter/form';
+import type {
+  OnActionClickParams,
+  VxeTableGridOptions,
+} from '#/adapter/vxe-table';
 import type { PaginationResult } from '#/types';
 
 import { computed, ref } from 'vue';
@@ -23,6 +24,7 @@ import { message } from 'antdv-next';
 
 import { useVbenForm } from '#/adapter/form';
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
+
 import {
   batchCreateAIModelApi,
   createAIModelApi,
@@ -32,13 +34,8 @@ import {
   getAllAIModelApi,
   syncAIProviderModelsApi,
   updateAIModelApi,
-} from '#/plugins/ai/api';
-
-import {
-  createModelSchema,
-  queryModelSchema,
-  useModelColumns,
-} from '../data';
+} from '../../../api';
+import { createModelSchema, queryModelSchema, useModelColumns } from '../data';
 
 const props = defineProps<{
   provider?: AIProviderResult;

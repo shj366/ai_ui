@@ -1,13 +1,11 @@
 <script setup lang="ts">
+import type { AIQuickPhraseParams, AIQuickPhraseResult } from '../../api';
+
 import type { VbenFormProps } from '#/adapter/form';
 import type {
   OnActionClickParams,
   VxeTableGridOptions,
 } from '#/adapter/vxe-table';
-import type {
-  AIQuickPhraseParams,
-  AIQuickPhraseResult,
-} from '#/plugins/ai/api';
 
 import { computed, ref } from 'vue';
 
@@ -19,13 +17,13 @@ import { message } from 'antdv-next';
 
 import { useVbenForm } from '#/adapter/form';
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
+
 import {
   createAIQuickPhraseApi,
   deleteAIQuickPhraseApi,
   getAIQuickPhraseListApi,
   updateAIQuickPhraseApi,
-} from '#/plugins/ai/api';
-
+} from '../../api';
 import {
   queryQuickPhraseSchema,
   quickPhraseSchema,

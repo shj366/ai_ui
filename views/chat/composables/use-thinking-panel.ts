@@ -1,10 +1,10 @@
 import type { ComputedRef, Ref } from 'vue';
 
-import type { ChatMessageItem } from '#/plugins/ai/runtime/message';
+import type { ChatMessageItem } from '../../../runtime/message';
 
 import { nextTick, ref, watch } from 'vue';
 
-import { getMessageTextContent } from '#/plugins/ai/runtime/message';
+import { getMessageTextContent } from '../../../runtime/message';
 
 type ThinkingPanelState = {
   autoOpened: boolean;
@@ -84,9 +84,7 @@ export function useThinkingPanel(options: UseThinkingPanelOptions) {
         const hasTextStarted = Boolean(
           getMessageTextContent(message, 'text').trim(),
         );
-        const shouldAutoExpand = Boolean(
-          message.streaming && !hasTextStarted,
-        );
+        const shouldAutoExpand = Boolean(message.streaming && !hasTextStarted);
 
         if (previous?.manualTouched) {
           nextStates[key] = previous;

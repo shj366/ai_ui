@@ -1,8 +1,9 @@
 import type { Ref } from 'vue';
 
+import type { AIModelResult, AIProviderResult } from '../../api';
+
 import type { VbenFormSchema } from '#/adapter/form';
 import type { OnActionClickFn, VxeGridProps } from '#/adapter/vxe-table';
-import type { AIModelResult, AIProviderResult } from '#/plugins/ai/api';
 
 import { h } from 'vue';
 
@@ -154,7 +155,6 @@ export function createProviderSchema(): VbenFormSchema[] {
     },
   ];
 }
-
 
 export function createModelSchema(): VbenFormSchema[] {
   return [

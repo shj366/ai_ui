@@ -15,11 +15,10 @@ import type {
   ToolCallStartEvent,
 } from '@ag-ui/core';
 
+import type { AIChatProviderMessage } from '../../runtime/message';
+import type { AGUIStreamEvent } from '../../types/ag-ui';
+import type { AIChatMessageBlock } from '../../types/message';
 import type { AGUIStreamAccumulator } from './runtime-state';
-
-import type { AIChatProviderMessage } from '#/plugins/ai/runtime/message';
-import type { AGUIStreamEvent } from '#/plugins/ai/types/ag-ui';
-import type { AIChatMessageBlock } from '#/plugins/ai/types/message';
 
 import {
   createAGUIBinaryFileBlock,

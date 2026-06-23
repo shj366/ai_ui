@@ -1,9 +1,9 @@
 import type { SourcesProps } from '@antdv-next/x';
 
-import type { ChatMessageItem } from '#/plugins/ai/runtime/message';
-import type { AIChatEventMessageBlock } from '#/plugins/ai/types/message';
+import type { ChatMessageItem } from '../../runtime/message';
+import type { AIChatEventMessageBlock } from '../../types/message';
 
-import { getMessageTextContent } from '#/plugins/ai/runtime/message';
+import { getMessageTextContent } from '../../runtime/message';
 
 const TEXT_MESSAGE_EVENT_TYPES = new Set([
   'TEXT_MESSAGE_CHUNK',
@@ -14,8 +14,8 @@ const TEXT_MESSAGE_EVENT_TYPES = new Set([
 
 const INTERNAL_LIFECYCLE_EVENT_TYPES = new Set([
   'MESSAGES_SNAPSHOT',
-  'REASONING_END',
   'REASONING_ENCRYPTED_VALUE',
+  'REASONING_END',
   'REASONING_MESSAGE_END',
   'REASONING_MESSAGE_START',
   'REASONING_START',
@@ -109,11 +109,15 @@ function extractSourceItems(
 
   if (candidateUrl && isExternalUrl(candidateUrl) && !seen.has(candidateUrl)) {
     seen.add(candidateUrl);
+    let description: string | undefined;
+    if (typeof record.description === 'string') {
+      description = record.description;
+    } else if (typeof record.snippet === 'string') {
+      description = record.snippet;
+    }
+
     items.push({
-      description:
-        typeof record.description === 'string'
-          ? record.description
-          : (typeof record.snippet === 'string' ? record.snippet : undefined),
+      description,
       key: candidateUrl,
       title:
         (typeof record.title === 'string' && record.title) ||
@@ -140,10 +144,7 @@ export function getAGUIEventSourceItems(
   return items;
 }
 
-function hasEventType(
-  block: AIChatEventMessageBlock,
-  eventTypes: Set<string>,
-) {
+function hasEventType(block: AIChatEventMessageBlock, eventTypes: Set<string>) {
   return [block.event_type, ...(block.event_types ?? [])].some((eventType) =>
     eventTypes.has(eventType),
   );

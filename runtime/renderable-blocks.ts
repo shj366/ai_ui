@@ -43,7 +43,10 @@ function parseDataUrl(url: string) {
 
 function getHtmlAttr(tag: string, name: string) {
   const escapedName = name.replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`);
-  const pattern = new RegExp(String.raw`\b${escapedName}\s*=\s*(["'])(.*?)\1`, 'iu');
+  const pattern = new RegExp(
+    String.raw`\b${escapedName}\s*=\s*(["'])(.*?)\1`,
+    'iu',
+  );
   return pattern.exec(tag)?.[2]?.trim() || null;
 }
 
@@ -217,39 +220,45 @@ function extractMarkdownInlineFiles(content: string, messageId: string) {
     },
   );
 
-  nextContent = nextContent.replaceAll(HTML_MEDIA_TAG_PATTERN, (tag, tagType) => {
-    const src = getHtmlAttr(tag, 'src');
-    if (!src) {
-      return tag;
-    }
+  nextContent = nextContent.replaceAll(
+    HTML_MEDIA_TAG_PATTERN,
+    (tag, tagType) => {
+      const src = getHtmlAttr(tag, 'src');
+      if (!src) {
+        return tag;
+      }
 
-    const normalizedTagType = String(tagType).toLowerCase();
-    const shouldExtract =
-      normalizedTagType === 'audio' ||
-      normalizedTagType === 'video' ||
-      parseDataUrl(src) !== null;
-    if (!shouldExtract || !isRenderableMediaUrl(src)) {
-      return tag;
-    }
+      const normalizedTagType = String(tagType).toLowerCase();
+      const shouldExtract =
+        normalizedTagType === 'audio' ||
+        normalizedTagType === 'video' ||
+        parseDataUrl(src) !== null;
+      if (!shouldExtract || !isRenderableMediaUrl(src)) {
+        return tag;
+      }
 
-    const name = addFile({
-      mimeType: getHtmlAttr(tag, 'type'),
-      name: getHtmlAttr(tag, 'title') ?? getHtmlAttr(tag, 'alt'),
-      tagType: normalizedTagType,
-      url: src,
-    });
-    return getInlineFileNotice(name);
-  });
+      const name = addFile({
+        mimeType: getHtmlAttr(tag, 'type'),
+        name: getHtmlAttr(tag, 'title') ?? getHtmlAttr(tag, 'alt'),
+        tagType: normalizedTagType,
+        url: src,
+      });
+      return getInlineFileNotice(name);
+    },
+  );
 
-  nextContent = nextContent.replaceAll(HTML_SOURCE_TAG_PATTERN, (tag, _, src) => {
-    if (!isRenderableMediaUrl(src)) {
-      return tag;
-    }
+  nextContent = nextContent.replaceAll(
+    HTML_SOURCE_TAG_PATTERN,
+    (tag, _, src) => {
+      if (!isRenderableMediaUrl(src)) {
+        return tag;
+      }
 
-    const mimeType = getHtmlAttr(tag, 'type');
-    const name = addFile({ mimeType, tagType: null, url: src });
-    return getInlineFileNotice(name);
-  });
+      const mimeType = getHtmlAttr(tag, 'type');
+      const name = addFile({ mimeType, tagType: null, url: src });
+      return getInlineFileNotice(name);
+    },
+  );
 
   nextContent = nextContent.replaceAll(DATA_URL_PATTERN, (url) => {
     const name = addFile({ url });
@@ -275,7 +284,10 @@ export function createDefaultRenderableBlocks(
   const events = allEvents.filter(
     (block) => !options.shouldSuppressEventBlock?.(message, block),
   );
-  const sourceItems = collectSourceItems(allEvents, options.getEventSourceItems);
+  const sourceItems = collectSourceItems(
+    allEvents,
+    options.getEventSourceItems,
+  );
   const inlineExtraction = extractMarkdownInlineFiles(text, message.id);
   const files = [...getMessageFileBlocks(message), ...inlineExtraction.files];
   const hasTextStarted = Boolean(text.trim());
@@ -292,9 +304,7 @@ export function createDefaultRenderableBlocks(
 
   if (events.length > 0) {
     blocks.push({
-      items: events.map((event, index) =>
-        toRenderableEventItem(event, index),
-      ),
+      items: events.map((event, index) => toRenderableEventItem(event, index)),
       key: `${message.id}-events`,
       type: 'events',
     });

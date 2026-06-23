@@ -3,7 +3,7 @@ import type {
   AIProviderParams,
   AIProviderResult,
   AIProviderUpdateParams,
-} from '#/plugins/ai/api';
+} from '../../../api';
 
 import { computed, onMounted, ref } from 'vue';
 
@@ -19,13 +19,13 @@ import { useInfiniteScroll } from '@vueuse/core';
 import { message } from 'antdv-next';
 
 import { useVbenForm } from '#/adapter/form';
+
 import {
   createAIProviderApi,
   deleteAIProviderApi,
   getAIProviderListApi,
   updateAIProviderApi,
-} from '#/plugins/ai/api';
-
+} from '../../../api';
 import {
   createProviderSchema,
   getProviderTypeLabel,

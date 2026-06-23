@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AIProviderResult } from '#/plugins/ai/api';
+import type { AIProviderResult } from '../../api';
 
 import { computed, ref } from 'vue';
 

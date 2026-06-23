@@ -1,6 +1,7 @@
+import type { AIQuickPhraseResult } from '../../api';
+
 import type { VbenFormSchema } from '#/adapter/form';
 import type { OnActionClickFn, VxeGridProps } from '#/adapter/vxe-table';
-import type { AIQuickPhraseResult } from '#/plugins/ai/api';
 
 import { $t } from '@vben/locales';
 

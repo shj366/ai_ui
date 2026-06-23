@@ -9,7 +9,7 @@ import type {
 import type {
   AIChatConversationDetail,
   AIChatConversationDetailResult,
-} from '#/plugins/ai/api/chat';
+} from '../../api/chat';
 import type {
   AGUIActivityMessage,
   AGUIAssistantMessage,
@@ -18,23 +18,21 @@ import type {
   AGUIMessagesSnapshotEvent,
   AGUISystemMessage,
   AGUIUserMessage,
-} from '#/plugins/ai/types/ag-ui';
+} from '../../types/ag-ui';
 import type {
   AIChatMessageBlock,
   AIChatMessageDetail,
   AIMessageRoleType,
   AIMessageType,
-} from '#/plugins/ai/types/message';
+} from '../../types/message';
 
 import {
+  AGUI_DEVELOPER_MESSAGE_EVENT_TYPE,
+  AGUI_SYSTEM_MESSAGE_EVENT_TYPE,
   createAGUIBinaryFileBlock,
   createAGUIEventBlock,
   createAGUIInputSourceFileBlock,
   normalizeAGUIToolResultBlocks,
-} from './block-mappers';
-import {
-  AGUI_DEVELOPER_MESSAGE_EVENT_TYPE,
-  AGUI_SYSTEM_MESSAGE_EVENT_TYPE,
 } from './block-mappers';
 import { isRecord, resolveMetadataFilename } from './utils';
 
@@ -320,12 +318,12 @@ function normalizeAGUIActivityMessageBlocks(
     }
     case 'binary': {
       const mimeType = typeof file.mimeType === 'string' ? file.mimeType : null;
-      const url =
-        typeof file.url === 'string'
-          ? file.url
-          : typeof file.data === 'string' && mimeType
-            ? `data:${mimeType};base64,${file.data}`
-            : null;
+      let url: null | string = null;
+      if (typeof file.url === 'string') {
+        url = file.url;
+      } else if (typeof file.data === 'string' && mimeType) {
+        url = `data:${mimeType};base64,${file.data}`;
+      }
 
       return [
         createAGUIBinaryFileBlock({

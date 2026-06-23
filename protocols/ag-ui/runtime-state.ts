@@ -1,12 +1,6 @@
-import type {
-  AIChatProviderMessage,
-} from '../../runtime/message';
-
-import type { AGUIStreamEvent } from '#/plugins/ai/types/ag-ui';
-import type {
-  AIChatMessage,
-  AIChatMessageBlock,
-} from '#/plugins/ai/types/message';
+import type { AIChatProviderMessage } from '../../runtime/message';
+import type { AGUIStreamEvent } from '../../types/ag-ui';
+import type { AIChatMessage, AIChatMessageBlock } from '../../types/message';
 
 import { getRecordValue, resolveTimestamp } from './utils';
 
@@ -140,7 +134,8 @@ export function createOrGetToolCallState(
 
   accumulator.toolCalls.set(nextToolCallId, {
     ...state,
-    conversationId: state.conversationId ?? resolveConversationId(event, accumulator) ?? null,
+    conversationId:
+      state.conversationId ?? resolveConversationId(event, accumulator) ?? null,
     parentMessageId: state.parentMessageId ?? resolveParentMessageId(event),
     toolCallName: state.toolCallName ?? resolveToolCallName(event),
   });

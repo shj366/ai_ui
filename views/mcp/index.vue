@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import type { VbenFormProps } from '@vben/common-ui';
 
+import type { AIMcpParams, AIMcpResult } from '../../api';
+
 import type {
   OnActionClickParams,
   VxeTableGridOptions,
 } from '#/adapter/vxe-table';
-import type { AIMcpParams, AIMcpResult } from '#/plugins/ai/api';
 
 import { computed, ref } from 'vue';
 
@@ -17,13 +18,13 @@ import { message } from 'antdv-next';
 
 import { useVbenForm } from '#/adapter/form';
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
+
 import {
   createAIMcpApi,
   deleteAIMcpApi,
   getAIMcpListApi,
   updateAIMcpApi,
-} from '#/plugins/ai/api';
-
+} from '../../api';
 import {
   formatArgsInput,
   formatEnvInput,

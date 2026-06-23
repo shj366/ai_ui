@@ -19,9 +19,8 @@ import { preferences } from '@vben/preferences';
 import { useAccessStore } from '@vben/stores';
 
 import { requestClient } from '#/api/request';
-import {
-  normalizeAIChatConversationDetail,
-} from '#/plugins/ai/protocols';
+
+import { normalizeAIChatConversationDetail } from '../protocols';
 
 export type AIActionResult = null | string;
 

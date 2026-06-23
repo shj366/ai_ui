@@ -5,14 +5,13 @@ import type {
   AIChatEventMessageBlock,
   AIChatFileMessageBlock,
   AIChatMessageBlock,
-} from '#/plugins/ai/types/message';
+} from '../../types/message';
 
 import {
   normalizeAIChatEventBlock,
   normalizeAIChatFileBlock,
   uniqueAIChatEventTypes,
-} from '#/plugins/ai/runtime/message';
-
+} from '../../runtime/message';
 import { isRecord, parseDataUrl } from './utils';
 
 function buildAGUIDataUrl(
@@ -58,10 +57,7 @@ function normalizeAGUIVisualEventType(type: string) {
   }
 }
 
-function getAGUIEventTypes(
-  type: string,
-  extras?: string[],
-) {
+function getAGUIEventTypes(type: string, extras?: string[]) {
   const normalizedType = normalizeAGUIVisualEventType(type);
   return uniqueAIChatEventTypes(normalizedType, type, extras);
 }
@@ -96,12 +92,18 @@ export function createAGUIInputSourceFileBlock(
   mimeType?: null | string,
 ): AIChatFileMessageBlock {
   const resolvedMimeType = mimeType ?? source?.mimeType ?? null;
+  let sourceType: 'base64' | 'url' | null = null;
+  if (source?.type === 'data') {
+    sourceType = 'base64';
+  } else if (source?.type === 'url') {
+    sourceType = 'url';
+  }
+
   return normalizeAIChatFileBlock({
     file_type: type,
     mime_type: resolvedMimeType,
     name: name ?? null,
-    source_type:
-      source?.type === 'data' ? 'base64' : (source?.type === 'url' ? 'url' : null),
+    source_type: sourceType,
     type: 'file',
     url:
       source?.type === 'url'
@@ -122,14 +124,18 @@ export function createAGUIBinaryFileBlock(params: {
   url?: null | string;
   urlMimeTypeFallback?: null | string;
 }): AIChatFileMessageBlock {
+  let sourceType: 'base64' | 'url' | null = null;
+  if (typeof params.data === 'string') {
+    sourceType = 'base64';
+  } else if (typeof params.url === 'string') {
+    sourceType = 'url';
+  }
+
   return normalizeAIChatFileBlock({
     file_type: params.fileType ?? null,
     mime_type: params.mimeType ?? null,
     name: params.name ?? null,
-    source_type:
-      typeof params.data === 'string'
-        ? 'base64'
-        : (typeof params.url === 'string' ? 'url' : null),
+    source_type: sourceType,
     type: 'file',
     url:
       params.url ??
@@ -245,7 +251,13 @@ function createToolResultFileBlock(
   const url = dataAsUrl ? rawData : rawUrl;
   const data = dataAsUrl || dataUrl ? null : rawData;
   const mimeType =
-    getStringValue(value, 'mimeType', 'mime_type', 'mediaType', 'contentType') ??
+    getStringValue(
+      value,
+      'mimeType',
+      'mime_type',
+      'mediaType',
+      'contentType',
+    ) ??
     dataAsUrl?.mimeType ??
     dataUrl?.mimeType ??
     (rawData && !dataAsUrl ? 'image/png' : null);

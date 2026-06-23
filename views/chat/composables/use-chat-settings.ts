@@ -3,7 +3,7 @@ import type { Ref } from 'vue';
 import type {
   AIChatComposerParams,
   AIChatConversationDetail,
-} from '#/plugins/ai/api/chat';
+} from '../../../api/chat';
 
 import { computed, ref, watch } from 'vue';
 
