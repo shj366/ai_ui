@@ -79,6 +79,7 @@ import {
 import ChatSender from './components/chat-sender.vue';
 import ChatSettingsPanel from './components/chat-settings-panel.vue';
 import ChatSidebar from './components/chat-sidebar.vue';
+import { useChatAttachmentDownloads } from './composables/use-chat-attachment-downloads';
 import { useChatScroll } from './composables/use-chat-scroll';
 import { useChatSession } from './composables/use-chat-session';
 import { useChatSettings } from './composables/use-chat-settings';
@@ -115,6 +116,7 @@ const {
   scrollToBottom,
   scrollToTop,
 } = useChatScroll();
+const { executeAttachmentDownloads } = useChatAttachmentDownloads();
 
 const {
   abort: abortTransientRequest,
@@ -726,6 +728,7 @@ async function submitChat(
       );
     }
 
+    await executeAttachmentDownloads(transientMessages.value);
     setTransientMessages([]);
   }
 
