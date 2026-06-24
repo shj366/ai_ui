@@ -71,6 +71,7 @@ export interface CreateChatBubbleListRoleOptions {
 }
 
 const MAX_DATA_URL_PREVIEW_BYTES = 8 * 1024 * 1024;
+const MAX_EVENT_TEXT_PREVIEW_LENGTH = 4000;
 const REASONING_END_EVENT_TYPES = new Set([
   'REASONING_END',
   'REASONING_MESSAGE_END',
@@ -770,25 +771,92 @@ function renderDataPreview(
   });
 }
 
+function formatEventTextPreview(text: string) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(trimmed), null, 2);
+  } catch {
+    return trimmed;
+  }
+}
+
+function renderEventTextPreview(text: string, title: string): VNodeChild {
+  const content = formatEventTextPreview(text);
+  if (!content) {
+    return null;
+  }
+
+  const truncated =
+    content.length > MAX_EVENT_TEXT_PREVIEW_LENGTH
+      ? `${content.slice(0, MAX_EVENT_TEXT_PREVIEW_LENGTH)}\n\n内容过长，已截断以保持页面流畅。`
+      : content;
+
+  return h('div', { class: 'min-w-0 space-y-1.5' }, [
+    h(
+      'div',
+      {
+        class: 'text-[11px] font-medium leading-none text-muted-foreground',
+      },
+      title,
+    ),
+    h(
+      'pre',
+      {
+        class:
+          'max-h-[260px] max-w-full overflow-auto rounded-xl border border-border/70 bg-background/80 p-3 text-xs leading-5 text-foreground shadow-inner',
+      },
+      truncated,
+    ),
+  ]);
+}
+
 function renderEventContent(
   item: AIChatEventMessageBlock,
   MarkdownContent: ReturnType<typeof createMarkdownContentRenderer>,
   isDark: boolean,
 ): VNodeChild {
   const children: VNodeChild[] = [];
+  const eventText = item.text?.trim() ?? '';
 
-  if (item.status === 'error' && item.text?.trim()) {
+  if (item.status === 'error' && eventText) {
     children.push(
       h(MarkdownContent, {
-        content: item.text,
+        content: eventText,
       }),
     );
   }
 
-  const dataPreview =
-    item.status === 'error'
-      ? renderDataPreview(item.data, '错误详情', isDark)
-      : null;
+  if (
+    item.status !== 'error' &&
+    eventText &&
+    eventBlockHasAnyType(item, TOOL_CALL_ARG_EVENT_TYPES)
+  ) {
+    children.push(renderEventTextPreview(eventText, '工具参数'));
+  }
+
+  if (
+    item.status !== 'error' &&
+    eventText &&
+    eventBlockHasAnyType(item, TOOL_CALL_RESULT_EVENT_TYPES)
+  ) {
+    children.push(renderEventTextPreview(eventText, '工具结果'));
+  }
+
+  const shouldPreviewEventData =
+    item.status === 'error' ||
+    (eventBlockHasAnyType(item, TOOL_CALL_RESULT_EVENT_TYPES) &&
+      Boolean((item.data as { contentPreview?: unknown })?.contentPreview));
+  const dataPreview = shouldPreviewEventData
+    ? renderDataPreview(
+        item.data,
+        item.status === 'error' ? '错误详情' : '工具结果详情',
+        isDark,
+      )
+    : null;
   if (dataPreview) {
     children.push(dataPreview);
   }
@@ -880,10 +948,46 @@ function buildThoughtChainItem(
     collapsible: Boolean(content),
     content,
     description: getEventDisplayDescription(item),
+    icon: renderThoughtChainStatusIcon(status),
     key: keySuffix ? `${key}-${keySuffix}` : key,
     status,
     title,
   };
+}
+
+function renderThoughtChainStatusIcon(status: ThoughtChainItemType['status']) {
+  switch (status) {
+    case 'abort': {
+      return h(IconifyIcon, {
+        class: 'size-3.5 text-muted-foreground',
+        icon: 'mdi:stop-circle-outline',
+      });
+    }
+    case 'error': {
+      return h(IconifyIcon, {
+        class: 'size-3.5 text-destructive',
+        icon: 'mdi:alert-circle-outline',
+      });
+    }
+    case 'loading': {
+      return h(IconifyIcon, {
+        class: 'size-3.5 text-primary',
+        icon: 'mdi:loading',
+      });
+    }
+    case 'success': {
+      return h(IconifyIcon, {
+        class: 'size-3.5 text-emerald-500',
+        icon: 'mdi:check-circle-outline',
+      });
+    }
+    default: {
+      return h(IconifyIcon, {
+        class: 'size-3.5 text-muted-foreground',
+        icon: 'mdi:circle-outline',
+      });
+    }
+  }
 }
 
 function getCompletedToolPhaseStatus(
@@ -995,15 +1099,24 @@ function renderMessageEvents(
     {
       key: `${message.id}-events`,
       class:
-        'min-w-0 max-w-full rounded-2xl border border-border/70 bg-muted/20 px-3 py-3',
+        'min-w-0 max-w-full rounded-2xl border border-border/70 bg-muted/20 px-3 py-3 shadow-sm dark:bg-muted/10',
     },
     [
       h(
         'div',
         {
-          class: 'mb-2 text-xs font-medium leading-none text-muted-foreground',
+          class:
+            'mb-2 inline-flex items-center gap-1.5 text-xs font-medium leading-none text-muted-foreground',
         },
-        '执行过程',
+        [
+          h(IconifyIcon, {
+            class: 'size-3.5',
+            icon: message.streaming
+              ? 'mdi:progress-clock'
+              : 'mdi:timeline-check-outline',
+          }),
+          '执行过程',
+        ],
       ),
       h(ThoughtChain, {
         defaultExpandedKeys: expandedKeys,
@@ -1018,8 +1131,10 @@ function renderAssistantPending() {
   return h(
     'div',
     {
+      'aria-label': '加载中',
       class:
-        'inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/35 px-3 py-2 text-xs text-muted-foreground',
+        'inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-muted/35 px-2.5 py-2 text-muted-foreground',
+      role: 'status',
     },
     [
       h('span', { class: 'size-1.5 animate-pulse rounded-full bg-current' }),
@@ -1029,7 +1144,6 @@ function renderAssistantPending() {
       h('span', {
         class: 'size-1.5 animate-pulse rounded-full bg-current delay-300',
       }),
-      h('span', '正在组织回复'),
     ],
   );
 }
@@ -1200,6 +1314,19 @@ function renderMessageHeader(
   );
 }
 
+function getErrorBubbleClasses(
+  message: ChatMessageItem,
+): BubbleProps['classes'] {
+  if (message.message_type !== 'error') {
+    return undefined;
+  }
+
+  return {
+    content:
+      '!border !border-destructive/35 !bg-destructive/10 !text-destructive shadow-none dark:!bg-destructive/15',
+  };
+}
+
 function renderMessageAvatar(message: ChatMessageItem): BubbleProps['avatar'] {
   const aAvatar = resolveComponent('a-avatar');
   return h(aAvatar, undefined, () => (message.role === 'user' ? '你' : 'AI'));
@@ -1318,6 +1445,7 @@ export function createChatBubbleListRole(
       return {
         avatar: renderMessageAvatar(message),
         class: 'mb-3.5',
+        classes: getErrorBubbleClasses(message),
         editable: false,
         footer: renderMessageFooter(message, options),
         footerPlacement: 'outer-start',
@@ -1344,6 +1472,7 @@ export function createChatBubbleListRole(
       return {
         avatar: renderMessageAvatar(message),
         class: 'mb-3.5',
+        classes: getErrorBubbleClasses(message),
         editable: options.isEditingMessage(message)
           ? {
               cancelText: '取消',

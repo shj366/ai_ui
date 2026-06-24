@@ -102,9 +102,18 @@ const resourcesLoading = ref(false);
 const {
   autoFollowMessageScroll,
   handleMessageContainerScroll,
+  messageContainerRef,
+  resumeAutoFollowMessageScroll,
   scrollToBottom,
+  scrollToBottomIfFollowing,
   scrollToTop,
+  showScrollToBottom,
 } = useChatScroll();
+
+function setMessageContainerRef(element: unknown) {
+  messageContainerRef.value =
+    element instanceof HTMLElement ? element : undefined;
+}
 
 const {
   abort: abortTransientRequest,
@@ -787,6 +796,14 @@ const displayMessages = computed<ChatMessageItem[]>(() => {
   );
 });
 
+watch(
+  displayMessages,
+  () => {
+    scrollToBottomIfFollowing();
+  },
+  { flush: 'post' },
+);
+
 const { isThinkingExpanded, setThinkingExpanded } = useThinkingPanel({
   autoFollowMessageScroll,
   displayMessages,
@@ -1267,37 +1284,50 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div
-        class="flex-1 overflow-x-hidden overflow-y-auto px-5 py-5 md:px-6 md:py-6"
-        @scroll="handleMessageContainerScroll"
-      >
+      <div class="relative min-h-0 flex-1">
         <div
-          v-if="detailLoading"
-          class="flex min-h-full items-center justify-center"
+          :ref="setMessageContainerRef"
+          class="h-full overflow-x-hidden overflow-y-auto px-5 py-5 scroll-smooth md:px-6 md:py-6"
+          @scroll="handleMessageContainerScroll"
         >
-          <a-spin />
-        </div>
-        <div
-          v-else-if="displayMessages.length === 0"
-          class="flex min-h-full items-center justify-center"
-        >
-          <div class="w-full max-w-[720px]">
-            <Welcome
-              :description="
-                selectedProviderId && selectedModelId
-                  ? `当前模型：${selectedProviderModelLabel}`
-                  : '选择供应商和模型后开始对话'
-              "
-              title="你好，我是 FBA UI 智能助手"
-            />
+          <div
+            v-if="detailLoading"
+            class="flex min-h-full items-center justify-center"
+          >
+            <a-spin />
           </div>
+          <div
+            v-else-if="displayMessages.length === 0"
+            class="flex min-h-full items-center justify-center"
+          >
+            <div class="w-full max-w-[720px]">
+              <Welcome
+                :description="
+                  selectedProviderId && selectedModelId
+                    ? `当前模型：${selectedProviderModelLabel}`
+                    : '选择供应商和模型后开始对话'
+                "
+                title="你好，我是 FBA UI 智能助手"
+              />
+            </div>
+          </div>
+          <BubbleList
+            v-else
+            :items="bubbleListItems"
+            :role="bubbleListRole"
+            class="min-h-full"
+          />
         </div>
-        <BubbleList
-          v-else
-          :items="bubbleListItems"
-          :role="bubbleListRole"
-          class="min-h-full"
-        />
+
+        <button
+          v-if="showScrollToBottom"
+          class="absolute bottom-4 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-popover/95 px-3 py-1.5 text-xs font-medium text-popover-foreground shadow-lg backdrop-blur transition hover:bg-accent"
+          type="button"
+          @click="resumeAutoFollowMessageScroll"
+        >
+          <IconifyIcon class="size-3.5" icon="mdi:arrow-down" />
+          回到底部
+        </button>
       </div>
 
       <Suggestion
