@@ -1,11 +1,7 @@
-import type { Ref } from 'vue';
-
 import type { AIModelResult, AIProviderResult } from '../../api';
 
 import type { VbenFormSchema } from '#/adapter/form';
 import type { OnActionClickFn, VxeGridProps } from '#/adapter/vxe-table';
-
-import { h } from 'vue';
 
 import { $t } from '@vben/locales';
 
@@ -19,10 +15,6 @@ export const PROVIDER_TYPE_OPTIONS = [
   { label: 'OpenRouter', value: 4 },
   { label: 'OpenAI Responses', value: 5 },
 ];
-
-export function buildProviderNameMap(providers: AIProviderResult[]) {
-  return new Map(providers.map((item) => [item.id, item.name]));
-}
 
 export function pickActiveProviderId(
   providers: AIProviderResult[],
@@ -45,7 +37,6 @@ export function getProviderTypeLabel(type: number) {
 }
 
 export function useModelColumns(
-  providerNameMap: Ref<Map<number, string>>,
   onActionClick?: OnActionClickFn<AIModelResult>,
 ): VxeGridProps['columns'] {
   return [
@@ -54,20 +45,6 @@ export function useModelColumns(
       title: $t('common.table.id'),
       type: 'seq',
       width: 50,
-    },
-    {
-      field: 'provider_id',
-      title: '供应商',
-      slots: {
-        default: ({ row }: { row: AIModelResult }) => {
-          return h(
-            'span',
-            providerNameMap.value.get(row.provider_id) ||
-              `ID ${row.provider_id}`,
-          );
-        },
-      },
-      width: 140,
     },
     { field: 'model_id', title: '模型 ID', align: 'left' },
     {

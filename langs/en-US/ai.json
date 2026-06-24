@@ -1,6 +1,8 @@
 {
   "menu": "AI",
   "chat": "AI Chat",
+  "config": "Config",
+  "default_model": "Default Model",
   "provider": "Provider",
   "model": "Providers & Models",
   "mcp": "MCP",

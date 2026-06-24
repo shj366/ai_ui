@@ -1,6 +1,6 @@
-import type { AIChatProviderMessage } from '../../runtime/message';
 import type { AGUIStreamEvent } from '../../types/ag-ui';
 import type { AIChatMessage, AIChatMessageBlock } from '../../types/message';
+import type { AIChatProviderMessage } from '../message';
 
 import { getRecordValue, resolveTimestamp } from './utils';
 

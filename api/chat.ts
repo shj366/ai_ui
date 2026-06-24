@@ -11,7 +11,6 @@ import type {
 
 import type { Recordable } from '@vben/types';
 
-import type { AIChatProtocolName } from '../protocols/factory';
 import type { AIChatMessageDetail, AIMessageType } from '../types/message';
 
 import { useAppConfig } from '@vben/hooks';
@@ -20,7 +19,7 @@ import { useAccessStore } from '@vben/stores';
 
 import { requestClient } from '#/api/request';
 
-import { normalizeAIChatConversationDetail } from '../protocols';
+import { normalizeAGUIConversationDetail } from '../runtime/ag-ui/deserialize';
 
 export type AIActionResult = null | string;
 
@@ -262,10 +261,6 @@ export interface BuildChatCompletionRequestInput {
   promptText?: string;
 }
 
-export interface AIChatProtocolOptions {
-  protocolName?: AIChatProtocolName;
-}
-
 function parseExtraBody(
   raw: null | string | undefined,
 ): null | Recordable<unknown> | undefined {
@@ -383,12 +378,44 @@ export function getAIChatRequestHeaders() {
   };
 }
 
+function formatAIChatValidationDetail(detail: unknown) {
+  if (typeof detail === 'string') {
+    return detail;
+  }
+
+  if (!Array.isArray(detail)) {
+    return '';
+  }
+
+  return detail
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return '';
+      }
+
+      const record = item as Recordable<unknown>;
+      const loc = Array.isArray(record.loc) ? record.loc.join('.') : '';
+      const msg = typeof record.msg === 'string' ? record.msg : '';
+      return [loc, msg].filter(Boolean).join(': ');
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+
 export async function readAIChatErrorMessage(response: Response) {
   const text = await response.text();
 
   try {
     const payload = JSON.parse(text);
-    return payload?.error ?? payload?.msg ?? payload?.message ?? text;
+    const validationMessage = formatAIChatValidationDetail(payload?.detail);
+    return (
+      payload?.error ||
+      payload?.msg ||
+      payload?.message ||
+      validationMessage ||
+      text ||
+      `HTTP ${response.status}`
+    );
   } catch {
     return text || `HTTP ${response.status}`;
   }
@@ -414,13 +441,12 @@ export async function getRecentAIChatConversationsApi(
 
 export async function getAIChatConversationDetailApi(
   conversationId: string,
-  options: AIChatProtocolOptions = {},
 ): Promise<AIChatConversationDetail> {
   const data = await requestClient.get<AIChatConversationDetailResult>(
     `/api/v1/conversations/${conversationId}`,
   );
 
-  return normalizeAIChatConversationDetail(data, options.protocolName);
+  return normalizeAGUIConversationDetail(data);
 }
 
 export async function updateAIChatConversationApi(

@@ -43,6 +43,7 @@ import { message } from 'antdv-next';
 import { useVbenForm } from '#/adapter/form';
 
 import {
+  getAIAssistantDefaultModelOptionalApi,
   getAllAIMcpApi,
   getAllAIModelApi,
   getAllAIProviderApi,
@@ -53,10 +54,6 @@ import {
   updateAIChatConversationApi,
   updateAIChatMessageApi,
 } from '../../api/chat';
-import {
-  createAIChatProtocolDriver,
-  DEFAULT_AI_CHAT_PROTOCOL_NAME,
-} from '../../protocols';
 import {
   buildTransientMessageItems,
   createProviderUserMessage,
@@ -74,6 +71,7 @@ import {
 } from './adapters/conversation-items';
 import {
   createChatBubbleListRole,
+  hasRenderableChatMessage,
   renderChatMessageBubbleContent,
 } from './adapters/message-bubble-role';
 import ChatSender from './components/chat-sender.vue';
@@ -84,14 +82,6 @@ import { useChatSession } from './composables/use-chat-session';
 import { useChatSettings } from './composables/use-chat-settings';
 import { useSenderToolbar } from './composables/use-sender-toolbar';
 import { useThinkingPanel } from './composables/use-thinking-panel';
-
-const currentChatProtocol = createAIChatProtocolDriver(
-  DEFAULT_AI_CHAT_PROTOCOL_NAME,
-);
-const currentChatProtocolName = currentChatProtocol.name;
-const currentChatProtocolOptions = {
-  protocolName: currentChatProtocolName,
-} as const;
 
 const { isDark } = usePreferences();
 const prompt = ref('');
@@ -123,9 +113,7 @@ const {
   onRequest: onTransientRequest,
   setMessages: setTransientMessages,
   transientRequestError,
-} = useAIChatStream({
-  protocolName: currentChatProtocolOptions.protocolName,
-});
+} = useAIChatStream();
 const sending = computed(() => isRequesting.value);
 
 function resetComposerState(clearPrompt = false) {
@@ -172,7 +160,6 @@ const {
   notifySuccess: (content) => {
     message.success(content);
   },
-  protocolName: currentChatProtocolOptions.protocolName,
   renameConversationFormData,
   resetComposerState,
   clearTransientMessages: () => {
@@ -255,6 +242,20 @@ async function fetchProviders() {
   } finally {
     resourcesLoading.value = false;
   }
+}
+
+async function applyAssistantDefaultModel(options: { force?: boolean } = {}) {
+  if (!options.force && selectedProviderId.value && selectedModelId.value) {
+    return;
+  }
+
+  const defaultModel = await getAIAssistantDefaultModelOptionalApi();
+  if (!defaultModel || Number(defaultModel.status) !== 1) {
+    return;
+  }
+
+  selectedProviderId.value = defaultModel.provider_id;
+  selectedModelId.value = defaultModel.model_id;
 }
 
 async function fetchMcps() {
@@ -777,7 +778,7 @@ function shouldRenderChatMessage(message: ChatMessageItem) {
     return true;
   }
 
-  return currentChatProtocol.getRenderableBlocks(message).length > 0;
+  return hasRenderableChatMessage(message);
 }
 
 const displayMessages = computed<ChatMessageItem[]>(() => {
@@ -804,7 +805,6 @@ const bubbleListItems = computed(() => {
         : renderChatMessageBubbleContent(message, {
             isDark: isDark.value,
             isThinkingExpanded,
-            protocolDriver: currentChatProtocol,
             setThinkingExpanded,
           }),
       extraInfo: {
@@ -1059,7 +1059,6 @@ const bubbleListRole = computed<BubbleListProps['role']>(() =>
     onRegenerateUserMessage: regenerateUserMessage,
     onResendEditedMessage: resendEditedMessage,
     onSaveEditedMessage: saveEditedMessage,
-    protocolDriver: currentChatProtocol,
     selectedModelId: selectedModelId.value,
     selectedModelLabel: selectedModelLabel.value,
     setThinkingExpanded,
@@ -1150,6 +1149,7 @@ const [RenameConversationModal, renameConversationModalApi] = useVbenModal({
 
 onMounted(async () => {
   await fetchProviders();
+  await applyAssistantDefaultModel({ force: true });
   await fetchMcps();
   await fetchQuickPhrasesFromToolbar();
   await initializeSession();
@@ -1164,6 +1164,7 @@ onActivated(async () => {
 
   await refreshChatResources();
   await initializeSession();
+  await applyAssistantDefaultModel({ force: true });
 });
 
 onBeforeUnmount(() => {

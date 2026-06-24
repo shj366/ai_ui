@@ -1,6 +1,8 @@
 {
   "menu": "AI",
   "chat": "AI Chat",
+  "config": "配置管理",
+  "default_model": "默认模型",
   "provider": "供应商管理",
   "model": "供应商与模型",
   "mcp": "MCP 管理",

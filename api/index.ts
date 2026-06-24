@@ -6,6 +6,14 @@ import type { PaginationResult } from '#/types';
 
 import { requestClient } from '#/api/request';
 
+import { getAIChatRequestHeaders, resolveAIChatApiUrl } from './chat';
+
+interface ResponseSchema<T> {
+  code: number;
+  data?: T;
+  msg?: string;
+}
+
 interface AIProviderQueryParams {
   cursor?: null | string;
   name?: null | string;
@@ -68,6 +76,36 @@ export interface AIBatchCreateModelsParams {
 
 export interface AIModelResult extends AIModelParams {
   id: number;
+  created_time: string;
+  updated_time?: null | string;
+}
+
+export interface AIDefaultModelParams {
+  provider_id: number;
+  model_id: string;
+  status: number;
+}
+
+export interface AIDefaultModelResult extends AIDefaultModelParams {
+  id: number;
+  scene: 'assistant';
+  provider_name: string;
+  provider_type: number;
+  created_time: string;
+  updated_time?: null | string;
+}
+
+export interface AIConfigParams {
+  id: number;
+  name: string;
+  type?: null | string;
+  key: string;
+  value: string;
+  is_frontend: boolean;
+  remark?: null | string;
+}
+
+export interface AIConfigResult extends AIConfigParams {
   created_time: string;
   updated_time?: null | string;
 }
@@ -194,6 +232,53 @@ export async function deleteAIModelApi(pks: number[]) {
   return requestClient.delete<AIActionResult>('/api/v1/models', {
     data: { pks },
   });
+}
+
+export async function getAIAssistantDefaultModelApi() {
+  return requestClient.get<AIDefaultModelResult>(
+    '/api/v1/default-models/assistant',
+  );
+}
+
+export async function getAIAssistantDefaultModelOptionalApi() {
+  const response = await fetch(
+    resolveAIChatApiUrl('/api/v1/default-models/assistant'),
+    {
+      headers: getAIChatRequestHeaders(),
+      method: 'GET',
+    },
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const payload =
+    (await response.json()) as ResponseSchema<AIDefaultModelResult>;
+  if (payload.code !== 200 || !payload.data) {
+    return null;
+  }
+
+  return payload.data;
+}
+
+export async function updateAIAssistantDefaultModelApi(
+  data: AIDefaultModelParams,
+) {
+  return requestClient.put<AIActionResult>(
+    '/api/v1/default-models/assistant',
+    data,
+  );
+}
+
+export async function getAllAIConfigApi() {
+  return requestClient.get<AIConfigResult[]>('/api/v1/sys/configs/all', {
+    params: { type: 'AI' },
+  });
+}
+
+export async function updateAIConfigApi(data: AIConfigParams[]) {
+  return requestClient.put<AIActionResult>('/api/v1/sys/configs', data);
 }
 
 export async function getAIMcpDetailApi(pk: number) {
