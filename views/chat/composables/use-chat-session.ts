@@ -3,16 +3,9 @@ import type { Ref } from 'vue';
 import type {
   AIChatConversationDetail,
   AIChatConversationResult,
-<<<<<<< HEAD
 } from '../../../api/chat';
 import type { AIChatProtocolName } from '../../../protocols';
 import type { ChatMessageItem } from '../../../runtime/message';
-=======
-} from '#/plugins/ai/api/chat';
-import type { AIChatProtocolName } from '#/plugins/ai/protocols';
-import type { ChatMessageItem } from '#/plugins/ai/runtime/message';
-import type { Ref } from 'vue';
->>>>>>> 508193624bbee807793a8f3a87ee1a7cb963a08f
 
 import { computed, ref } from 'vue';
 

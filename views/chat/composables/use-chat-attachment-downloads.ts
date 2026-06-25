@@ -1,25 +1,14 @@
-<<<<<<< HEAD
 import type { ChatMessageItem } from '../../../runtime/message';
-=======
-import type { ChatMessageItem } from '#/plugins/ai/runtime/message';
->>>>>>> 508193624bbee807793a8f3a87ee1a7cb963a08f
 
 import { message } from 'antdv-next';
 
 import { baseRequestClient } from '#/api/request';
 import { triggerBlobDownload } from '#/plugins/attachment_export/api';
-<<<<<<< HEAD
 
 import {
   getMessageEventBlocks,
   getMessageTextContent,
 } from '../../../runtime/message';
-=======
-import {
-  getMessageEventBlocks,
-  getMessageTextContent,
-} from '#/plugins/ai/runtime/message';
->>>>>>> 508193624bbee807793a8f3a87ee1a7cb963a08f
 
 interface DownloadAttachmentsCommand {
   action: 'download_attachments' | 'download_qualification_attachments';
