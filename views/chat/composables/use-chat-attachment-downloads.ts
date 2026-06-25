@@ -111,6 +111,11 @@ function collectDownloadCommands(
       commands.push(...parseDownloadCommandText(content));
     }
 
+    const contentPreview = data?.contentPreview;
+    if (typeof contentPreview === 'string') {
+      commands.push(...parseDownloadCommandText(contentPreview));
+    }
+
     const directCommand = normalizeDownloadCommand(data);
     if (directCommand) {
       commands.push(directCommand);
