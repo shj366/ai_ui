@@ -30,9 +30,7 @@ function normalizeEntityIds(value: unknown) {
     return [];
   }
 
-  return value
-    .map((item) => Number(item))
-    .filter((item) => Number.isInteger(item) && item > 0);
+  return value.map(Number).filter((item) => Number.isInteger(item) && item > 0);
 }
 
 function normalizeDownloadCommand(
