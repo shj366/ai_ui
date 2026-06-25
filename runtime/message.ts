@@ -287,6 +287,10 @@ function normalizeProviderMessage(
   return [item];
 }
 
+function hasReasoningBlocks(message: Pick<AIChatMessage, 'blocks'>) {
+  return getBlocksByType(message, 'reasoning').length > 0;
+}
+
 function shouldMergeAssistantMessages(
   current: ChatMessageItem | undefined,
   incoming: ChatMessageItem,
@@ -300,6 +304,10 @@ function shouldMergeAssistantMessages(
   }
 
   if (current.message_type === 'error' || incoming.message_type === 'error') {
+    return false;
+  }
+
+  if (!hasReasoningBlocks(current) && !hasReasoningBlocks(incoming)) {
     return false;
   }
 
