@@ -15,9 +15,9 @@ import type {
   ToolCallStartEvent,
 } from '@ag-ui/core';
 
-import type { AIChatProviderMessage } from '../../runtime/message';
 import type { AGUIStreamEvent } from '../../types/ag-ui';
 import type { AIChatMessageBlock } from '../../types/message';
+import type { AIChatProviderMessage } from '../message';
 import type { AGUIStreamAccumulator } from './runtime-state';
 
 import {

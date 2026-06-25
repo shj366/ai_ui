@@ -3,11 +3,7 @@ import type {
   AIChatRegenerateParams,
   AIChatTransportMode,
 } from '../api/chat';
-import type {
-  AIChatProtocol,
-  AIChatProtocolChunk,
-  AIChatProtocolName,
-} from '../protocols/factory';
+import type { AGUIStreamEvent } from '../types/ag-ui';
 import type { AIChatProviderMessage, ChatTransientStatus } from './message';
 
 import { ref } from 'vue';
@@ -18,8 +14,13 @@ import {
   resolveAIChatApiUrl,
   resolveAIChatTransportUrl,
 } from '../api/chat';
-import { createAIChatProtocol } from '../protocols';
-import { buildMessageId, createProviderSeedMessage } from './message';
+import { toAIChatMessageFromAGUIEvent } from './ag-ui/runtime-events';
+import { createAGUIStreamAccumulator } from './ag-ui/runtime-state';
+import {
+  buildMessageId,
+  createProviderSeedMessage,
+  mergeStreamMessage,
+} from './message';
 
 export interface AIChatProviderRequest {
   body: AIChatCompletionParams | AIChatRegenerateParams;
@@ -33,10 +34,6 @@ export interface AIChatStreamMessageInfo {
   id: string;
   message: AIChatProviderMessage;
   status: ChatTransientStatus;
-}
-
-export interface UseAIChatStreamOptions {
-  protocolName?: AIChatProtocolName;
 }
 
 const STREAM_RENDER_INTERVAL_MS = 48;
@@ -95,6 +92,62 @@ function createAssistantLoadingMessageInfo(): AIChatStreamMessageInfo {
   };
 }
 
+function parseAGUIStreamEvent(data: string): AGUIStreamEvent | null {
+  const rawData = data.trim();
+  if (!rawData) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawData) as unknown;
+    if (parsed && typeof parsed === 'object' && 'type' in parsed) {
+      return parsed as AGUIStreamEvent;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
+function consumeAGUISSEBuffer(
+  buffer: string,
+  onEvent: (event: AGUIStreamEvent) => void,
+) {
+  const segments = buffer.split(/\r?\n\r?\n/u);
+  const rest = segments.pop() || '';
+
+  for (const segment of segments) {
+    const lines = segment
+      .split(/\r?\n/u)
+      .map((line) => line.trim())
+      .filter(Boolean);
+
+    if (lines.length === 0) {
+      continue;
+    }
+
+    const data = lines
+      .filter((line) => line.startsWith('data:'))
+      .map((line) => line.slice(5).trim())
+      .join('\n');
+    const event = parseAGUIStreamEvent(data);
+    if (event) {
+      onEvent(event);
+    }
+  }
+
+  return rest;
+}
+
+function resolveAGUIRunErrorMessage(event: AGUIStreamEvent) {
+  if (event.type !== 'RUN_ERROR' || !('message' in event)) {
+    return '';
+  }
+
+  return typeof event.message === 'string' ? event.message.trim() : '';
+}
+
 async function readAIChatStream(
   response: Response,
   onChunk: (text: string) => void,
@@ -124,19 +177,12 @@ async function readAIChatStream(
   }
 }
 
-export function useAIChatStream(options: UseAIChatStreamOptions = {}) {
-  return useChatStream(createAIChatProtocol(options.protocolName));
-}
-
-function useChatStream(
-  protocol: AIChatProtocol<AIChatProtocolChunk, AIChatProviderMessage>,
-) {
+export function useAIChatStream() {
   const isRequesting = ref(false);
   const messages = ref<AIChatStreamMessageInfo[]>([]);
   const transientRequestError = ref<null | string>(null);
 
   let abortController: AbortController | null = null;
-  let protocolState = protocol.createState();
   let requestId = 0;
   let pendingAssistantUpdate: null | {
     message: AIChatProviderMessage;
@@ -228,11 +274,33 @@ function useChatStream(
     }
 
     const currentRequestId = ++requestId;
-    const chunks: AIChatProtocolChunk[] = [];
+    const streamState = createAGUIStreamAccumulator();
+    let streamBuffer = '';
     let currentAssistantMessage: AIChatProviderMessage | undefined;
 
+    function applyStreamEvent(event: AGUIStreamEvent) {
+      const runErrorMessage = resolveAGUIRunErrorMessage(event);
+      if (runErrorMessage) {
+        transientRequestError.value = runErrorMessage;
+      }
+
+      const message = toAIChatMessageFromAGUIEvent(event, streamState);
+      if (!message || currentRequestId !== requestId) {
+        return;
+      }
+
+      if (message.role !== 'assistant') {
+        return;
+      }
+
+      currentAssistantMessage = mergeStreamMessage(
+        currentAssistantMessage,
+        message,
+      );
+      queueAssistantMessageUpdate(currentAssistantMessage, 'updating');
+    }
+
     abortController = new AbortController();
-    protocolState = protocol.resetState(protocolState);
     transientRequestError.value = null;
     isRequesting.value = true;
     pendingAssistantUpdate = null;
@@ -267,24 +335,26 @@ function useChatStream(
           return;
         }
 
-        const chunk = { data: text };
-        chunks.push(chunk);
-        const nextAssistantMessage = protocol.transformMessage({
-          chunk,
-          chunks,
-          originMessage: currentAssistantMessage,
-          responseHeaders: response.headers,
-          state: protocolState,
-          status: 'updating',
-        });
+        streamBuffer = consumeAGUISSEBuffer(
+          `${streamBuffer}${text}`,
+          applyStreamEvent,
+        );
 
-        if (nextAssistantMessage === currentAssistantMessage) {
-          return;
+        if (streamBuffer === text) {
+          const event = parseAGUIStreamEvent(text);
+          if (event) {
+            streamBuffer = '';
+            applyStreamEvent(event);
+          }
         }
-
-        currentAssistantMessage = nextAssistantMessage;
-        queueAssistantMessageUpdate(currentAssistantMessage, 'updating');
       });
+
+      if (streamBuffer.trim()) {
+        streamBuffer = consumeAGUISSEBuffer(
+          `${streamBuffer}\n\n`,
+          applyStreamEvent,
+        );
+      }
 
       if (currentAssistantMessage) {
         queueAssistantMessageUpdate(currentAssistantMessage, 'success', {

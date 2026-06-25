@@ -4,21 +4,17 @@ import type {
   BubbleListProps,
   BubbleProps,
   FileCardProps,
+  SourcesProps,
   ThoughtChainItemType,
 } from '@antdv-next/x';
 
 import type { Component, VNodeChild } from 'vue';
 
-import type { AIChatProtocolDriver } from '../../../protocols';
 import type { ChatMessageItem } from '../../../runtime/message';
 import type {
   AIChatEventMessageBlock,
   AIChatFileMessageBlock,
 } from '../../../types/message';
-import type {
-  AIChatRenderableBlock,
-  AIChatRenderableEventItem,
-} from '../../../types/render';
 import type {
   MarkdownSourceItems,
   MarkdownStreamingState,
@@ -41,10 +37,10 @@ import {
   getMessageEventBlocks,
   getMessageFileBlocks,
   getMessageTextContent,
+  normalizeAIChatFileBlock,
   parseDateLabel,
 } from '../../../runtime/message';
 import { AIJsonPreview } from '../renderers/custom/json-preview';
-import { AIUnsupportedBlock } from '../renderers/custom/unsupported-block';
 import {
   createAIReplyMarkdownStreaming,
   createMarkdownContentRenderer,
@@ -52,8 +48,6 @@ import {
   getDataUrlInfo,
   isDataUrl,
   normalizeInlineSourceItems,
-  renderCodeBlock,
-  renderMermaidBlock,
 } from '../renderers/markdown-content';
 
 export interface CreateChatBubbleListRoleOptions {
@@ -71,13 +65,13 @@ export interface CreateChatBubbleListRoleOptions {
   onRegenerateUserMessage: (message: ChatMessageItem) => void;
   onResendEditedMessage: (content: string) => void;
   onSaveEditedMessage: (content: string) => void;
-  protocolDriver: AIChatProtocolDriver;
   selectedModelLabel?: string;
   selectedModelId?: null | string;
   setThinkingExpanded: (message: ChatMessageItem, expanded: boolean) => void;
 }
 
 const MAX_DATA_URL_PREVIEW_BYTES = 8 * 1024 * 1024;
+const MAX_EVENT_TEXT_PREVIEW_LENGTH = 4000;
 const REASONING_END_EVENT_TYPES = new Set([
   'REASONING_END',
   'REASONING_MESSAGE_END',
@@ -107,6 +101,139 @@ const TOOL_CALL_EVENT_TYPES = new Set([
 ]);
 const TOOL_CALL_RESULT_EVENT_TYPES = new Set(['TOOL_CALL_RESULT']);
 const ACTIVITY_EVENT_TYPES = new Set(['ACTIVITY_DELTA', 'ACTIVITY_SNAPSHOT']);
+
+const TEXT_MESSAGE_EVENT_TYPES = new Set([
+  'TEXT_MESSAGE_CHUNK',
+  'TEXT_MESSAGE_CONTENT',
+  'TEXT_MESSAGE_END',
+  'TEXT_MESSAGE_START',
+]);
+const INTERNAL_LIFECYCLE_EVENT_TYPES = new Set([
+  'MESSAGES_SNAPSHOT',
+  'REASONING_ENCRYPTED_VALUE',
+  'REASONING_END',
+  'REASONING_MESSAGE_END',
+  'REASONING_MESSAGE_START',
+  'REASONING_START',
+  'RUN_FINISHED',
+  'RUN_STARTED',
+  'STATE_DELTA',
+  'STATE_SNAPSHOT',
+  'STEP_FINISHED',
+  'STEP_STARTED',
+  'TEXT_MESSAGE_END',
+  'TEXT_MESSAGE_START',
+  'THINKING_END',
+  'THINKING_START',
+  'THINKING_TEXT_MESSAGE_END',
+  'THINKING_TEXT_MESSAGE_START',
+]);
+const DATA_URL_PATTERN = /data:([\w.+-]+\/[\w.+-]+)?;base64,[\w+/=_-]+/giu;
+const HTML_MEDIA_TAG_PATTERN =
+  /<(audio|img|video)\b[^>]*\bsrc\s*=\s*(["'])(.*?)\2[^>]*>/giu;
+const HTML_SOURCE_TAG_PATTERN =
+  /<source\b[^>]*\bsrc\s*=\s*(["'])(.*?)\1[^>]*>/giu;
+const MAX_SOURCE_STRING_LENGTH = 4096;
+
+type SourceItems = NonNullable<SourcesProps['items']>;
+
+function parseInlineDataUrl(url: string) {
+  const match = /^data:([^;,]+)?;base64,([\s\S]+)$/iu.exec(url.trim());
+  if (!match) {
+    return null;
+  }
+
+  return {
+    mimeType: match[1] || 'application/octet-stream',
+    value: match[2] ?? '',
+  };
+}
+
+function getHtmlAttr(tag: string, name: string) {
+  const escapedName = name.replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`);
+  const pattern = new RegExp(
+    String.raw`\b${escapedName}\s*=\s*(["'])(.*?)\1`,
+    'iu',
+  );
+  return pattern.exec(tag)?.[2]?.trim() || null;
+}
+
+function inferRenderableFileType(
+  fileType?: null | string,
+  mimeType?: null | string,
+) {
+  if (
+    fileType === 'audio' ||
+    fileType === 'document' ||
+    fileType === 'image' ||
+    fileType === 'video'
+  ) {
+    return fileType;
+  }
+  if (mimeType?.startsWith('audio/')) {
+    return 'audio';
+  }
+  if (mimeType?.startsWith('image/')) {
+    return 'image';
+  }
+  if (mimeType?.startsWith('video/')) {
+    return 'video';
+  }
+  if (mimeType) {
+    return 'document';
+  }
+  return null;
+}
+
+function buildInlineFileName(
+  type: null | string,
+  mimeType: null | string,
+  index: number,
+  title?: null | string,
+) {
+  if (title?.trim()) {
+    return title.trim();
+  }
+
+  let label: string;
+  switch (type) {
+    case 'audio': {
+      label = '内联音频';
+      break;
+    }
+    case 'image': {
+      label = '内联图片';
+      break;
+    }
+    case 'video': {
+      label = '内联视频';
+      break;
+    }
+    default: {
+      label = '内联文件';
+      break;
+    }
+  }
+
+  const suffix = mimeType ? ` (${mimeType})` : '';
+  return `${label} ${index + 1}${suffix}`;
+}
+
+function getInlineFileNotice(_name: string) {
+  return '';
+}
+
+function isRenderableMediaUrl(url: string) {
+  return /^https?:\/\//iu.test(url) || parseInlineDataUrl(url) !== null;
+}
+
+function isExternalUrl(value: string) {
+  if (value.length > MAX_SOURCE_STRING_LENGTH) {
+    return false;
+  }
+
+  return /^https?:\/\//iu.test(value.trim());
+}
 
 function eventBlockHasAnyType(
   block: AIChatEventMessageBlock,
@@ -407,6 +534,227 @@ function renderInlineSourcePanel(sourceItems: MarkdownSourceItems) {
   });
 }
 
+function extractSourceItems(
+  value: unknown,
+  items: SourceItems,
+  seen: Set<string>,
+  depth = 0,
+) {
+  if (depth > 3 || items.length >= 8 || value === null || value === undefined) {
+    return;
+  }
+
+  if (typeof value === 'string') {
+    if (value.length > MAX_SOURCE_STRING_LENGTH) {
+      return;
+    }
+
+    const url = value.trim();
+    if (!isExternalUrl(url) || seen.has(url)) {
+      return;
+    }
+    seen.add(url);
+    items.push({
+      key: url,
+      title: url,
+      url,
+    });
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      extractSourceItems(item, items, seen, depth + 1);
+      if (items.length >= 8) {
+        break;
+      }
+    }
+    return;
+  }
+
+  if (typeof value !== 'object') {
+    return;
+  }
+
+  const record = value as Record<string, unknown>;
+  const candidateUrl =
+    (typeof record.url === 'string' && record.url) ||
+    (typeof record.sourceUrl === 'string' && record.sourceUrl) ||
+    (typeof record.link === 'string' && record.link);
+
+  if (candidateUrl && isExternalUrl(candidateUrl) && !seen.has(candidateUrl)) {
+    seen.add(candidateUrl);
+    let description: string | undefined;
+    if (typeof record.description === 'string') {
+      description = record.description;
+    } else if (typeof record.snippet === 'string') {
+      description = record.snippet;
+    }
+
+    items.push({
+      description,
+      key: candidateUrl,
+      title:
+        (typeof record.title === 'string' && record.title) ||
+        (typeof record.label === 'string' && record.label) ||
+        (typeof record.name === 'string' && record.name) ||
+        candidateUrl,
+      url: candidateUrl,
+    });
+  }
+
+  for (const nested of Object.values(record)) {
+    extractSourceItems(nested, items, seen, depth + 1);
+    if (items.length >= 8) {
+      break;
+    }
+  }
+}
+
+function collectSourceItems(events: AIChatEventMessageBlock[]): SourceItems {
+  const items: SourceItems = [];
+  const seen = new Set<string>();
+
+  for (const event of events) {
+    extractSourceItems(event.data, items, seen);
+  }
+
+  return items.map((item, index) => ({
+    ...item,
+    key: item.key ?? item.url ?? index + 1,
+  }));
+}
+
+function shouldShowEventBlock(
+  message: ChatMessageItem,
+  block: AIChatEventMessageBlock,
+) {
+  const eventType = block.event_type;
+  const hasMainText = Boolean(getMessageTextContent(message, 'text').trim());
+  const hasReasoning = Boolean(
+    getMessageTextContent(message, 'reasoning').trim(),
+  );
+
+  if (eventBlockHasAnyType(block, INTERNAL_LIFECYCLE_EVENT_TYPES)) {
+    return false;
+  }
+
+  if (hasMainText && TEXT_MESSAGE_EVENT_TYPES.has(eventType)) {
+    return false;
+  }
+
+  if (hasReasoning && eventBlockHasAnyType(block, REASONING_END_EVENT_TYPES)) {
+    return false;
+  }
+
+  return true;
+}
+
+function getVisibleMessageEvents(message: ChatMessageItem) {
+  return getMessageEventBlocks(message).filter((block) =>
+    shouldShowEventBlock(message, block),
+  );
+}
+
+function extractMarkdownInlineFiles(content: string, messageId: string) {
+  const files = [] as ReturnType<typeof normalizeAIChatFileBlock>[];
+  const seen = new Map<string, string>();
+
+  function addFile(params: {
+    mimeType?: null | string;
+    name?: null | string;
+    tagType?: null | string;
+    url: string;
+  }) {
+    const parsed = parseInlineDataUrl(params.url);
+    const mimeType = params.mimeType ?? parsed?.mimeType ?? null;
+    const fileType = inferRenderableFileType(params.tagType, mimeType);
+    const existing = seen.get(params.url);
+    if (existing) {
+      return existing;
+    }
+
+    const name = buildInlineFileName(
+      fileType,
+      mimeType,
+      files.length,
+      params.name,
+    );
+    seen.set(params.url, name);
+    files.push(
+      normalizeAIChatFileBlock({
+        file_type: fileType,
+        mime_type: mimeType,
+        name,
+        source_type: parsed ? 'base64' : 'url',
+        type: 'file',
+        url: params.url,
+      }),
+    );
+    return name;
+  }
+
+  let nextContent = content.replaceAll(
+    /!\[([^\]]*)\]\((data:[^)]+)\)/giu,
+    (_, altText: string, url: string) => {
+      const name = addFile({ name: altText, tagType: 'image', url });
+      return getInlineFileNotice(name);
+    },
+  );
+
+  nextContent = nextContent.replaceAll(
+    HTML_MEDIA_TAG_PATTERN,
+    (tag, tagType) => {
+      const src = getHtmlAttr(tag, 'src');
+      if (!src) {
+        return tag;
+      }
+
+      const normalizedTagType = String(tagType).toLowerCase();
+      const shouldExtract =
+        normalizedTagType === 'audio' ||
+        normalizedTagType === 'video' ||
+        parseInlineDataUrl(src) !== null;
+      if (!shouldExtract || !isRenderableMediaUrl(src)) {
+        return tag;
+      }
+
+      const name = addFile({
+        mimeType: getHtmlAttr(tag, 'type'),
+        name: getHtmlAttr(tag, 'title') ?? getHtmlAttr(tag, 'alt'),
+        tagType: normalizedTagType,
+        url: src,
+      });
+      return getInlineFileNotice(name);
+    },
+  );
+
+  nextContent = nextContent.replaceAll(
+    HTML_SOURCE_TAG_PATTERN,
+    (tag, _, src) => {
+      if (!isRenderableMediaUrl(src)) {
+        return tag;
+      }
+
+      const mimeType = getHtmlAttr(tag, 'type');
+      const name = addFile({ mimeType, tagType: null, url: src });
+      return getInlineFileNotice(name);
+    },
+  );
+
+  nextContent = nextContent.replaceAll(DATA_URL_PATTERN, (url) => {
+    const name = addFile({ url });
+    return getInlineFileNotice(name);
+  });
+
+  return {
+    content: nextContent,
+    files,
+    hasExtractedFiles: files.length > 0,
+    key: `${messageId}-inline-files`,
+  };
+}
+
 function renderDataPreview(
   data: unknown,
   title: string,
@@ -423,25 +771,92 @@ function renderDataPreview(
   });
 }
 
+function formatEventTextPreview(text: string) {
+  const trimmed = text.trim();
+  if (!trimmed) {
+    return '';
+  }
+
+  try {
+    return JSON.stringify(JSON.parse(trimmed), null, 2);
+  } catch {
+    return trimmed;
+  }
+}
+
+function renderEventTextPreview(text: string, title: string): VNodeChild {
+  const content = formatEventTextPreview(text);
+  if (!content) {
+    return null;
+  }
+
+  const truncated =
+    content.length > MAX_EVENT_TEXT_PREVIEW_LENGTH
+      ? `${content.slice(0, MAX_EVENT_TEXT_PREVIEW_LENGTH)}\n\n内容过长，已截断以保持页面流畅。`
+      : content;
+
+  return h('div', { class: 'min-w-0 space-y-1.5' }, [
+    h(
+      'div',
+      {
+        class: 'text-[11px] font-medium leading-none text-muted-foreground',
+      },
+      title,
+    ),
+    h(
+      'pre',
+      {
+        class:
+          'max-h-[260px] max-w-full overflow-auto rounded-xl border border-border/70 bg-background/80 p-3 text-xs leading-5 text-foreground shadow-inner',
+      },
+      truncated,
+    ),
+  ]);
+}
+
 function renderEventContent(
-  item: AIChatRenderableEventItem,
+  item: AIChatEventMessageBlock,
   MarkdownContent: ReturnType<typeof createMarkdownContentRenderer>,
   isDark: boolean,
 ): VNodeChild {
   const children: VNodeChild[] = [];
+  const eventText = item.text?.trim() ?? '';
 
-  if (item.status === 'error' && item.text?.trim()) {
+  if (item.status === 'error' && eventText) {
     children.push(
       h(MarkdownContent, {
-        content: item.text,
+        content: eventText,
       }),
     );
   }
 
-  const dataPreview =
-    item.status === 'error'
-      ? renderDataPreview(item.data, '错误详情', isDark)
-      : null;
+  if (
+    item.status !== 'error' &&
+    eventText &&
+    eventBlockHasAnyType(item, TOOL_CALL_ARG_EVENT_TYPES)
+  ) {
+    children.push(renderEventTextPreview(eventText, '工具参数'));
+  }
+
+  if (
+    item.status !== 'error' &&
+    eventText &&
+    eventBlockHasAnyType(item, TOOL_CALL_RESULT_EVENT_TYPES)
+  ) {
+    children.push(renderEventTextPreview(eventText, '工具结果'));
+  }
+
+  const shouldPreviewEventData =
+    item.status === 'error' ||
+    (eventBlockHasAnyType(item, TOOL_CALL_RESULT_EVENT_TYPES) &&
+      Boolean((item.data as { contentPreview?: unknown })?.contentPreview));
+  const dataPreview = shouldPreviewEventData
+    ? renderDataPreview(
+        item.data,
+        item.status === 'error' ? '错误详情' : '工具结果详情',
+        isDark,
+      )
+    : null;
   if (dataPreview) {
     children.push(dataPreview);
   }
@@ -453,17 +868,8 @@ function renderEventContent(
   return h('div', { class: 'min-w-0 space-y-2' }, children);
 }
 
-function eventItemHasAnyType(
-  item: AIChatRenderableEventItem,
-  eventTypes: Set<string>,
-) {
-  return [item.eventType, ...(item.eventTypes ?? [])].some((eventType) =>
-    eventTypes.has(eventType),
-  );
-}
-
 function toThoughtChainStatus(
-  status: AIChatRenderableEventItem['status'],
+  status: AIChatEventMessageBlock['status'],
 ): ThoughtChainItemType['status'] {
   switch (status) {
     case 'abort': {
@@ -484,8 +890,8 @@ function toThoughtChainStatus(
   }
 }
 
-function getEventDisplayTitle(item: AIChatRenderableEventItem) {
-  switch (item.eventType) {
+function getEventDisplayTitle(item: AIChatEventMessageBlock) {
+  switch (item.event_type) {
     case 'TOOL_CALL_ARGS':
     case 'TOOL_CALL_CHUNK': {
       return '传入工具参数';
@@ -501,53 +907,91 @@ function getEventDisplayTitle(item: AIChatRenderableEventItem) {
     }
   }
 
-  if (eventItemHasAnyType(item, TOOL_CALL_END_EVENT_TYPES)) {
+  if (eventBlockHasAnyType(item, TOOL_CALL_END_EVENT_TYPES)) {
     return '工具调用完成';
   }
 
-  if (eventItemHasAnyType(item, TOOL_CALL_RESULT_EVENT_TYPES)) {
+  if (eventBlockHasAnyType(item, TOOL_CALL_RESULT_EVENT_TYPES)) {
     return '读取工具结果';
   }
 
-  if (eventItemHasAnyType(item, TOOL_CALL_ARG_EVENT_TYPES)) {
+  if (eventBlockHasAnyType(item, TOOL_CALL_ARG_EVENT_TYPES)) {
     return '传入工具参数';
   }
 
-  if (eventItemHasAnyType(item, TOOL_CALL_EVENT_TYPES)) {
+  if (eventBlockHasAnyType(item, TOOL_CALL_EVENT_TYPES)) {
     return '调用工具';
   }
 
-  if (eventItemHasAnyType(item, ACTIVITY_EVENT_TYPES)) {
+  if (eventBlockHasAnyType(item, ACTIVITY_EVENT_TYPES)) {
     return '执行活动';
   }
 
   return item.title || '执行步骤';
 }
 
-function getEventDisplayDescription(item: AIChatRenderableEventItem) {
+function getEventDisplayDescription(item: AIChatEventMessageBlock) {
   return item.summary || item.title;
 }
 
 function buildThoughtChainItem(
-  item: AIChatRenderableEventItem,
+  item: AIChatEventMessageBlock,
   title: string,
   status: ThoughtChainItemType['status'],
   content?: VNodeChild,
   keySuffix = '',
 ): ThoughtChainItemType {
+  const key = item.event_key || item.event_type;
+
   return {
     blink: status === 'loading',
     collapsible: Boolean(content),
     content,
     description: getEventDisplayDescription(item),
-    key: keySuffix ? `${item.key}-${keySuffix}` : item.key,
+    icon: renderThoughtChainStatusIcon(status),
+    key: keySuffix ? `${key}-${keySuffix}` : key,
     status,
     title,
   };
 }
 
+function renderThoughtChainStatusIcon(status: ThoughtChainItemType['status']) {
+  switch (status) {
+    case 'abort': {
+      return h(IconifyIcon, {
+        class: 'size-3.5 text-muted-foreground',
+        icon: 'mdi:stop-circle-outline',
+      });
+    }
+    case 'error': {
+      return h(IconifyIcon, {
+        class: 'size-3.5 text-destructive',
+        icon: 'mdi:alert-circle-outline',
+      });
+    }
+    case 'loading': {
+      return h(IconifyIcon, {
+        class: 'size-3.5 text-primary',
+        icon: 'mdi:loading',
+      });
+    }
+    case 'success': {
+      return h(IconifyIcon, {
+        class: 'size-3.5 text-emerald-500',
+        icon: 'mdi:check-circle-outline',
+      });
+    }
+    default: {
+      return h(IconifyIcon, {
+        class: 'size-3.5 text-muted-foreground',
+        icon: 'mdi:circle-outline',
+      });
+    }
+  }
+}
+
 function getCompletedToolPhaseStatus(
-  item: AIChatRenderableEventItem,
+  item: AIChatEventMessageBlock,
 ): ThoughtChainItemType['status'] {
   if (item.status === 'abort' || item.status === 'error') {
     return toThoughtChainStatus(item.status);
@@ -557,18 +1001,18 @@ function getCompletedToolPhaseStatus(
 }
 
 function getCurrentToolPhaseStatus(
-  item: AIChatRenderableEventItem,
+  item: AIChatEventMessageBlock,
 ): ThoughtChainItemType['status'] {
   return toThoughtChainStatus(item.status) ?? 'success';
 }
 
 function renderToolCallThoughtItems(
-  item: AIChatRenderableEventItem,
+  item: AIChatEventMessageBlock,
   content: VNodeChild,
 ) {
-  const hasArgs = eventItemHasAnyType(item, TOOL_CALL_ARG_EVENT_TYPES);
-  const hasResult = eventItemHasAnyType(item, TOOL_CALL_RESULT_EVENT_TYPES);
-  const hasEnd = eventItemHasAnyType(item, TOOL_CALL_END_EVENT_TYPES);
+  const hasArgs = eventBlockHasAnyType(item, TOOL_CALL_ARG_EVENT_TYPES);
+  const hasResult = eventBlockHasAnyType(item, TOOL_CALL_RESULT_EVENT_TYPES);
+  const hasEnd = eventBlockHasAnyType(item, TOOL_CALL_END_EVENT_TYPES);
   const currentStatus = getCurrentToolPhaseStatus(item);
   const completedStatus = getCompletedToolPhaseStatus(item);
   const items: ThoughtChainItemType[] = [];
@@ -578,7 +1022,7 @@ function renderToolCallThoughtItems(
       item,
       '调用工具',
       hasArgs || hasResult || hasEnd ? 'success' : currentStatus,
-      item.eventType === 'TOOL_CALL_START' ? content : undefined,
+      item.event_type === 'TOOL_CALL_START' ? content : undefined,
       'start',
     ),
   );
@@ -589,7 +1033,7 @@ function renderToolCallThoughtItems(
         item,
         '传入工具参数',
         hasResult || hasEnd ? 'success' : currentStatus,
-        TOOL_CALL_ARG_EVENT_TYPES.has(item.eventType) ? content : undefined,
+        TOOL_CALL_ARG_EVENT_TYPES.has(item.event_type) ? content : undefined,
         'args',
       ),
     );
@@ -601,7 +1045,7 @@ function renderToolCallThoughtItems(
         item,
         '读取工具结果',
         hasEnd ? completedStatus : currentStatus,
-        item.eventType === 'TOOL_CALL_RESULT' ? content : undefined,
+        item.event_type === 'TOOL_CALL_RESULT' ? content : undefined,
         'result',
       ),
     );
@@ -613,7 +1057,7 @@ function renderToolCallThoughtItems(
         item,
         '工具调用完成',
         completedStatus,
-        item.eventType === 'TOOL_CALL_END' ? content : undefined,
+        item.event_type === 'TOOL_CALL_END' ? content : undefined,
         'end',
       ),
     );
@@ -623,19 +1067,20 @@ function renderToolCallThoughtItems(
 }
 
 function renderMessageEvents(
-  block: Extract<AIChatRenderableBlock, { type: 'events' }>,
+  message: ChatMessageItem,
+  events: AIChatEventMessageBlock[],
   MarkdownContent: ReturnType<typeof createMarkdownContentRenderer>,
   isDark: boolean,
 ) {
-  if (block.items.length === 0) {
+  if (events.length === 0) {
     return null;
   }
 
-  const thoughtItems = block.items.flatMap((item) => {
+  const thoughtItems = events.flatMap((item) => {
     const content = renderEventContent(item, MarkdownContent, isDark);
     const status = toThoughtChainStatus(item.status);
 
-    if (eventItemHasAnyType(item, TOOL_CALL_EVENT_TYPES)) {
+    if (eventBlockHasAnyType(item, TOOL_CALL_EVENT_TYPES)) {
       return renderToolCallThoughtItems(item, content);
     }
 
@@ -652,17 +1097,26 @@ function renderMessageEvents(
   return h(
     'div',
     {
-      key: block.key,
+      key: `${message.id}-events`,
       class:
-        'min-w-0 max-w-full rounded-2xl border border-border/70 bg-muted/20 px-3 py-3',
+        'min-w-0 max-w-full rounded-2xl border border-border/70 bg-muted/20 px-3 py-3 shadow-sm dark:bg-muted/10',
     },
     [
       h(
         'div',
         {
-          class: 'mb-2 text-xs font-medium leading-none text-muted-foreground',
+          class:
+            'mb-2 inline-flex items-center gap-1.5 text-xs font-medium leading-none text-muted-foreground',
         },
-        '执行过程',
+        [
+          h(IconifyIcon, {
+            class: 'size-3.5',
+            icon: message.streaming
+              ? 'mdi:progress-clock'
+              : 'mdi:timeline-check-outline',
+          }),
+          '执行过程',
+        ],
       ),
       h(ThoughtChain, {
         defaultExpandedKeys: expandedKeys,
@@ -673,22 +1127,14 @@ function renderMessageEvents(
   );
 }
 
-function renderUnsupportedBlock(
-  block: Extract<AIChatRenderableBlock, { type: 'unsupported' }>,
-) {
-  return h(AIUnsupportedBlock as Component, {
-    key: block.key,
-    reason: block.reason,
-    title: block.title,
-  });
-}
-
 function renderAssistantPending() {
   return h(
     'div',
     {
+      'aria-label': '加载中',
       class:
-        'inline-flex items-center gap-2 rounded-full border border-border/70 bg-muted/35 px-3 py-2 text-xs text-muted-foreground',
+        'inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-muted/35 px-2.5 py-2 text-muted-foreground',
+      role: 'status',
     },
     [
       h('span', { class: 'size-1.5 animate-pulse rounded-full bg-current' }),
@@ -698,97 +1144,62 @@ function renderAssistantPending() {
       h('span', {
         class: 'size-1.5 animate-pulse rounded-full bg-current delay-300',
       }),
-      h('span', '正在组织回复'),
     ],
   );
 }
 
-function renderRenderableBlock(
-  block: AIChatRenderableBlock,
+function renderReasoningBlock(
   message: ChatMessageItem,
+  content: string,
   options: Pick<
     CreateChatBubbleListRoleOptions,
-    'isDark' | 'isThinkingExpanded' | 'setThinkingExpanded'
+    'isThinkingExpanded' | 'setThinkingExpanded'
   >,
   MarkdownContent: ReturnType<typeof createMarkdownContentRenderer>,
   markdownStreaming?: MarkdownStreamingState,
-): VNodeChild {
-  switch (block.type) {
-    case 'code': {
-      return h('div', { key: block.key }, [
-        renderCodeBlock(
-          block.content,
-          block.language ?? 'text',
-          options.isDark,
-        ),
-      ]);
-    }
-    case 'events': {
-      return renderMessageEvents(block, MarkdownContent, options.isDark);
-    }
-    case 'files': {
-      return renderMessageFiles(message, block.files);
-    }
-    case 'html':
-    case 'markdown': {
-      return h(MarkdownContent, {
-        key: block.key,
-        content: block.content,
-        sourceItems: block.type === 'markdown' ? block.sourceItems : undefined,
-        streaming: markdownStreaming,
-      });
-    }
-    case 'json': {
-      return h('div', { key: block.key }, [
-        renderDataPreview(block.data, block.title ?? '数据', options.isDark),
-      ]);
-    }
-    case 'mermaid': {
-      return h('div', { key: block.key }, [
-        renderMermaidBlock(block.content, options.isDark),
-      ]);
-    }
-    case 'reasoning': {
-      const thinkingActive = isThinkingActive(message);
-      return h(
-        Think,
-        {
-          blink: thinkingActive,
-          expanded: options.isThinkingExpanded(message),
-          loading: thinkingActive,
-          title: block.title ?? getThinkingToggleLabel(message),
-          'onUpdate:expanded': (expanded: boolean) => {
-            options.setThinkingExpanded(message, expanded);
-          },
-        },
-        () =>
-          h(MarkdownContent, {
-            content: block.content,
-            streaming: getReasoningMarkdownStreaming(
-              message,
-              markdownStreaming,
-            ),
-          }),
-      );
-    }
-    case 'sources': {
-      return h(
-        'div',
-        { key: block.key, class: 'min-w-0 max-w-full' },
-        [renderInlineSourcePanel(block.items)].filter(Boolean),
-      );
-    }
-    case 'unsupported': {
-      return renderUnsupportedBlock(block);
-    }
+) {
+  const thinkingActive = isThinkingActive(message);
+  return h(
+    Think,
+    {
+      blink: thinkingActive,
+      expanded: options.isThinkingExpanded(message),
+      loading: thinkingActive,
+      title: getThinkingToggleLabel(message),
+      'onUpdate:expanded': (expanded: boolean) => {
+        options.setThinkingExpanded(message, expanded);
+      },
+    },
+    () =>
+      h(MarkdownContent, {
+        content,
+        streaming: getReasoningMarkdownStreaming(message, markdownStreaming),
+      }),
+  );
+}
+
+export function hasRenderableChatMessage(message: ChatMessageItem) {
+  if (message.message_type === 'error') {
+    return Boolean(getMessageTextContent(message, 'text').trim());
   }
+
+  if (message.role === 'assistant' && message.streaming) {
+    return true;
+  }
+
+  return Boolean(
+    getMessageTextContent(message, 'text').trim() ||
+    getMessageTextContent(message, 'reasoning').trim() ||
+    getMessageFileBlocks(message).length > 0 ||
+    getVisibleMessageEvents(message).length > 0,
+  );
 }
 
 export function renderChatMessageBubbleContent(
   message: ChatMessageItem,
   options: Pick<
     CreateChatBubbleListRoleOptions,
-    'isDark' | 'isThinkingExpanded' | 'protocolDriver' | 'setThinkingExpanded'
+    'isDark' | 'isThinkingExpanded' | 'setThinkingExpanded'
   >,
 ): VNodeChild {
   const MarkdownContent = createMarkdownContentRenderer(options.isDark);
@@ -813,26 +1224,67 @@ export function renderChatMessageBubbleContent(
     ]);
   }
 
-  const renderableBlocks = options.protocolDriver.getRenderableBlocks(message);
+  const reasoningText = getMessageTextContent(message, 'reasoning');
+  const visibleEvents = getVisibleMessageEvents(message);
+  const allEvents = getMessageEventBlocks(message);
+  const sourceItems = collectSourceItems(allEvents);
+  const inlineExtraction = extractMarkdownInlineFiles(text, message.id);
+  const files = [...getMessageFileBlocks(message), ...inlineExtraction.files];
   const hasMainText = Boolean(text.trim());
+  const children: VNodeChild[] = [];
 
-  if (renderableBlocks.length === 0 && message.streaming) {
-    return h('div', { class: 'min-w-0 max-w-full' }, [
-      renderAssistantPending(),
-    ]);
-  }
-
-  const children = renderableBlocks
-    .map((block) =>
-      renderRenderableBlock(
-        block,
+  if (reasoningText.trim()) {
+    children.push(
+      renderReasoningBlock(
         message,
+        reasoningText,
         options,
         MarkdownContent,
         markdownStreaming,
       ),
-    )
-    .filter(Boolean);
+    );
+  }
+
+  const eventsNode = renderMessageEvents(
+    message,
+    visibleEvents,
+    MarkdownContent,
+    options.isDark,
+  );
+  if (eventsNode) {
+    children.push(eventsNode);
+  }
+
+  if (inlineExtraction.content.trim()) {
+    children.push(
+      h(MarkdownContent, {
+        key: `${message.id}-markdown`,
+        content: inlineExtraction.content,
+        sourceItems,
+        streaming: markdownStreaming,
+      }),
+    );
+  }
+
+  const sourcesNode = renderInlineSourcePanel(sourceItems);
+  if (sourcesNode) {
+    children.push(
+      h('div', { key: `${message.id}-sources`, class: 'min-w-0 max-w-full' }, [
+        sourcesNode,
+      ]),
+    );
+  }
+
+  const filesNode = renderMessageFiles(message, files);
+  if (filesNode) {
+    children.push(filesNode);
+  }
+
+  if (children.length === 0 && message.streaming) {
+    return h('div', { class: 'min-w-0 max-w-full' }, [
+      renderAssistantPending(),
+    ]);
+  }
 
   if (message.streaming && !hasMainText) {
     children.push(renderAssistantPending());
@@ -860,6 +1312,19 @@ function renderMessageHeader(
       parseDateLabel(message.created_time),
     ]),
   );
+}
+
+function getErrorBubbleClasses(
+  message: ChatMessageItem,
+): BubbleProps['classes'] {
+  if (message.message_type !== 'error') {
+    return undefined;
+  }
+
+  return {
+    content:
+      '!border !border-destructive/35 !bg-destructive/10 !text-destructive shadow-none dark:!bg-destructive/15',
+  };
 }
 
 function renderMessageAvatar(message: ChatMessageItem): BubbleProps['avatar'] {
@@ -980,6 +1445,7 @@ export function createChatBubbleListRole(
       return {
         avatar: renderMessageAvatar(message),
         class: 'mb-3.5',
+        classes: getErrorBubbleClasses(message),
         editable: false,
         footer: renderMessageFooter(message, options),
         footerPlacement: 'outer-start',
@@ -1006,6 +1472,7 @@ export function createChatBubbleListRole(
       return {
         avatar: renderMessageAvatar(message),
         class: 'mb-3.5',
+        classes: getErrorBubbleClasses(message),
         editable: options.isEditingMessage(message)
           ? {
               cancelText: '取消',

@@ -39,7 +39,6 @@ import { createModelSchema, queryModelSchema, useModelColumns } from '../data';
 
 const props = defineProps<{
   provider?: AIProviderResult;
-  providerNameMap: Map<number, string>;
 }>();
 
 const EMPTY_PAGINATION: PaginationResult<AIModelResult> = {
@@ -78,10 +77,7 @@ const gridOptions: VxeTableGridOptions<AIModelResult> = {
     },
     zoom: true,
   },
-  columns: useModelColumns(
-    computed(() => props.providerNameMap),
-    onActionClick,
-  ),
+  columns: useModelColumns(onActionClick),
   proxyConfig: {
     ajax: {
       query: async ({ page }, formValues) => {

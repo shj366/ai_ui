@@ -43,6 +43,7 @@ import { message } from 'antdv-next';
 import { useVbenForm } from '#/adapter/form';
 
 import {
+  getAIAssistantDefaultModelOptionalApi,
   getAllAIMcpApi,
   getAllAIModelApi,
   getAllAIProviderApi,
@@ -53,10 +54,6 @@ import {
   updateAIChatConversationApi,
   updateAIChatMessageApi,
 } from '../../api/chat';
-import {
-  createAIChatProtocolDriver,
-  DEFAULT_AI_CHAT_PROTOCOL_NAME,
-} from '../../protocols';
 import {
   buildTransientMessageItems,
   createProviderUserMessage,
@@ -74,6 +71,7 @@ import {
 } from './adapters/conversation-items';
 import {
   createChatBubbleListRole,
+  hasRenderableChatMessage,
   renderChatMessageBubbleContent,
 } from './adapters/message-bubble-role';
 import ChatSender from './components/chat-sender.vue';
@@ -85,14 +83,6 @@ import { useChatSession } from './composables/use-chat-session';
 import { useChatSettings } from './composables/use-chat-settings';
 import { useSenderToolbar } from './composables/use-sender-toolbar';
 import { useThinkingPanel } from './composables/use-thinking-panel';
-
-const currentChatProtocol = createAIChatProtocolDriver(
-  DEFAULT_AI_CHAT_PROTOCOL_NAME,
-);
-const currentChatProtocolName = currentChatProtocol.name;
-const currentChatProtocolOptions = {
-  protocolName: currentChatProtocolName,
-} as const;
 
 const { isDark } = usePreferences();
 const prompt = ref('');
@@ -113,10 +103,19 @@ const resourcesLoading = ref(false);
 const {
   autoFollowMessageScroll,
   handleMessageContainerScroll,
+  messageContainerRef,
+  resumeAutoFollowMessageScroll,
   scrollToBottom,
+  scrollToBottomIfFollowing,
   scrollToTop,
+  showScrollToBottom,
 } = useChatScroll();
 const { executeAttachmentDownloads } = useChatAttachmentDownloads();
+
+function setMessageContainerRef(element: unknown) {
+  messageContainerRef.value =
+    element instanceof HTMLElement ? element : undefined;
+}
 
 const {
   abort: abortTransientRequest,
@@ -125,9 +124,7 @@ const {
   onRequest: onTransientRequest,
   setMessages: setTransientMessages,
   transientRequestError,
-} = useAIChatStream({
-  protocolName: currentChatProtocolOptions.protocolName,
-});
+} = useAIChatStream();
 const sending = computed(() => isRequesting.value);
 
 function resetComposerState(clearPrompt = false) {
@@ -174,7 +171,6 @@ const {
   notifySuccess: (content) => {
     message.success(content);
   },
-  protocolName: currentChatProtocolOptions.protocolName,
   renameConversationFormData,
   resetComposerState,
   clearTransientMessages: () => {
@@ -257,6 +253,20 @@ async function fetchProviders() {
   } finally {
     resourcesLoading.value = false;
   }
+}
+
+async function applyAssistantDefaultModel(options: { force?: boolean } = {}) {
+  if (!options.force && selectedProviderId.value && selectedModelId.value) {
+    return;
+  }
+
+  const defaultModel = await getAIAssistantDefaultModelOptionalApi();
+  if (!defaultModel || Number(defaultModel.status) !== 1) {
+    return;
+  }
+
+  selectedProviderId.value = defaultModel.provider_id;
+  selectedModelId.value = defaultModel.model_id;
 }
 
 async function fetchMcps() {
@@ -781,7 +791,7 @@ function shouldRenderChatMessage(message: ChatMessageItem) {
     return true;
   }
 
-  return currentChatProtocol.getRenderableBlocks(message).length > 0;
+  return hasRenderableChatMessage(message);
 }
 
 const displayMessages = computed<ChatMessageItem[]>(() => {
@@ -789,6 +799,14 @@ const displayMessages = computed<ChatMessageItem[]>(() => {
     (message) => shouldRenderChatMessage(message),
   );
 });
+
+watch(
+  displayMessages,
+  () => {
+    scrollToBottomIfFollowing();
+  },
+  { flush: 'post' },
+);
 
 const { isThinkingExpanded, setThinkingExpanded } = useThinkingPanel({
   autoFollowMessageScroll,
@@ -808,7 +826,6 @@ const bubbleListItems = computed(() => {
         : renderChatMessageBubbleContent(message, {
             isDark: isDark.value,
             isThinkingExpanded,
-            protocolDriver: currentChatProtocol,
             setThinkingExpanded,
           }),
       extraInfo: {
@@ -1063,7 +1080,6 @@ const bubbleListRole = computed<BubbleListProps['role']>(() =>
     onRegenerateUserMessage: regenerateUserMessage,
     onResendEditedMessage: resendEditedMessage,
     onSaveEditedMessage: saveEditedMessage,
-    protocolDriver: currentChatProtocol,
     selectedModelId: selectedModelId.value,
     selectedModelLabel: selectedModelLabel.value,
     setThinkingExpanded,
@@ -1154,6 +1170,7 @@ const [RenameConversationModal, renameConversationModalApi] = useVbenModal({
 
 onMounted(async () => {
   await fetchProviders();
+  await applyAssistantDefaultModel({ force: true });
   await fetchMcps();
   await fetchQuickPhrasesFromToolbar();
   await initializeSession();
@@ -1168,6 +1185,7 @@ onActivated(async () => {
 
   await refreshChatResources();
   await initializeSession();
+  await applyAssistantDefaultModel({ force: true });
 });
 
 onBeforeUnmount(() => {
@@ -1270,37 +1288,50 @@ onBeforeUnmount(() => {
         </div>
       </div>
 
-      <div
-        class="flex-1 overflow-x-hidden overflow-y-auto px-5 py-5 md:px-6 md:py-6"
-        @scroll="handleMessageContainerScroll"
-      >
+      <div class="relative min-h-0 flex-1">
         <div
-          v-if="detailLoading"
-          class="flex min-h-full items-center justify-center"
+          :ref="setMessageContainerRef"
+          class="h-full overflow-x-hidden overflow-y-auto px-5 py-5 scroll-smooth md:px-6 md:py-6"
+          @scroll="handleMessageContainerScroll"
         >
-          <a-spin />
-        </div>
-        <div
-          v-else-if="displayMessages.length === 0"
-          class="flex min-h-full items-center justify-center"
-        >
-          <div class="w-full max-w-[720px]">
-            <Welcome
-              :description="
-                selectedProviderId && selectedModelId
-                  ? `当前模型：${selectedProviderModelLabel}`
-                  : '选择供应商和模型后开始对话'
-              "
-              title="你好，我是 FBA UI 智能助手"
-            />
+          <div
+            v-if="detailLoading"
+            class="flex min-h-full items-center justify-center"
+          >
+            <a-spin />
           </div>
+          <div
+            v-else-if="displayMessages.length === 0"
+            class="flex min-h-full items-center justify-center"
+          >
+            <div class="w-full max-w-[720px]">
+              <Welcome
+                :description="
+                  selectedProviderId && selectedModelId
+                    ? `当前模型：${selectedProviderModelLabel}`
+                    : '选择供应商和模型后开始对话'
+                "
+                title="你好，我是 FBA UI 智能助手"
+              />
+            </div>
+          </div>
+          <BubbleList
+            v-else
+            :items="bubbleListItems"
+            :role="bubbleListRole"
+            class="min-h-full"
+          />
         </div>
-        <BubbleList
-          v-else
-          :items="bubbleListItems"
-          :role="bubbleListRole"
-          class="min-h-full"
-        />
+
+        <button
+          v-if="showScrollToBottom"
+          class="absolute bottom-4 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-border bg-popover/95 px-3 py-1.5 text-xs font-medium text-popover-foreground shadow-lg backdrop-blur transition hover:bg-accent"
+          type="button"
+          @click="resumeAutoFollowMessageScroll"
+        >
+          <IconifyIcon class="size-3.5" icon="mdi:arrow-down" />
+          回到底部
+        </button>
       </div>
 
       <Suggestion

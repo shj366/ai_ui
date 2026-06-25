@@ -31,6 +31,24 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
+    name: 'PluginAIDefaultModel',
+    path: '/plugins/ai/default-model',
+    component: () => import('../views/default-model/index.vue'),
+    meta: {
+      title: $t('ai.default_model'),
+      icon: 'carbon:model-alt',
+    },
+  },
+  {
+    name: 'PluginAIConfig',
+    path: '/plugins/ai/config',
+    component: () => import('../views/config/index.vue'),
+    meta: {
+      title: $t('ai.config'),
+      icon: 'codicon:symbol-parameter',
+    },
+  },
+  {
     name: 'PluginAIMcp',
     path: '/plugins/ai/mcp',
     component: () => import('../views/mcp/index.vue'),

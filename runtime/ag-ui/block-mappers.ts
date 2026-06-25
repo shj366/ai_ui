@@ -11,7 +11,7 @@ import {
   normalizeAIChatEventBlock,
   normalizeAIChatFileBlock,
   uniqueAIChatEventTypes,
-} from '../../runtime/message';
+} from '../message';
 import { isRecord, parseDataUrl } from './utils';
 
 function buildAGUIDataUrl(
