@@ -2,6 +2,7 @@ import type {
   ActivityMessage,
   AssistantMessage,
   DeveloperMessage,
+  InputContent,
   MessagesSnapshotEvent,
   ReasoningMessage,
   SystemMessage,
@@ -11,7 +12,11 @@ import type {
 
 import type { Recordable } from '@vben/types';
 
-import type { AIChatMessageDetail, AIMessageType } from '../types/message';
+import type {
+  AIChatAttachmentType,
+  AIChatMessageDetail,
+  AIMessageType,
+} from '../types/message';
 
 import { useAppConfig } from '@vben/hooks';
 import { preferences } from '@vben/preferences';
@@ -205,6 +210,17 @@ export interface AIChatComposerParams {
   web_search?: AIWebSearchType;
 }
 
+export interface AIChatComposerAttachment {
+  data?: null | string;
+  file_type?: AIChatAttachmentType | null;
+  id?: string;
+  mime_type?: null | string;
+  name?: null | string;
+  size?: null | number;
+  source_type?: 'base64' | 'url' | null;
+  url?: null | string;
+}
+
 export interface AIChatConversationQueryParams {
   cursor?: null | string;
   size?: number;
@@ -256,9 +272,38 @@ export interface AIChatTransportRequest {
 }
 
 export interface BuildChatCompletionRequestInput {
+  attachments?: AIChatComposerAttachment[];
   conversationId?: null | string;
   params: AIChatComposerParams;
   promptText?: string;
+}
+
+export function inferAIChatAttachmentType(
+  name?: null | string,
+  mimeType?: null | string,
+): AIChatAttachmentType | null {
+  if (mimeType?.startsWith('audio/')) {
+    return 'audio';
+  }
+  if (mimeType?.startsWith('image/')) {
+    return 'image';
+  }
+  if (mimeType?.startsWith('video/')) {
+    return 'video';
+  }
+
+  const lowerName = name?.toLowerCase() ?? '';
+  if (/\.(avif|bmp|gif|jpe?g|png|svg|webp)$/u.test(lowerName)) {
+    return 'image';
+  }
+  if (/\.(aac|flac|m4a|mp3|ogg|wav|weba)$/u.test(lowerName)) {
+    return 'audio';
+  }
+  if (/\.(avi|m4v|mkv|mov|mp4|mpeg|webm)$/u.test(lowerName)) {
+    return 'video';
+  }
+
+  return 'document';
 }
 
 function parseExtraBody(
@@ -318,18 +363,100 @@ function toForwardedProps(
   };
 }
 
+function createAttachmentContent(
+  attachment: AIChatComposerAttachment,
+): InputContent | null {
+  const mimeType = attachment.mime_type || 'application/octet-stream';
+  const filename = attachment.name || 'attachment';
+  const attachmentUrl = attachment.url
+    ? resolveAIChatApiUrl(attachment.url)
+    : null;
+  const metadata = {
+    filename,
+    size: attachment.size ?? undefined,
+  };
+  const fileType =
+    attachment.file_type ?? inferAIChatAttachmentType(filename, mimeType);
+
+  if (attachmentUrl) {
+    const source = {
+      mimeType,
+      type: 'url' as const,
+      value: attachmentUrl,
+    };
+
+    if (fileType === 'audio' || fileType === 'document') {
+      return { metadata, source, type: fileType };
+    }
+    if (fileType === 'image' || fileType === 'video') {
+      return { metadata, source, type: fileType };
+    }
+
+    return {
+      filename,
+      mimeType,
+      type: 'binary',
+      url: attachmentUrl,
+    };
+  }
+
+  if (!attachment.data) {
+    return null;
+  }
+
+  const source = {
+    mimeType,
+    type: 'data' as const,
+    value: attachment.data,
+  };
+
+  if (fileType === 'audio' || fileType === 'document') {
+    return { metadata, source, type: fileType };
+  }
+  if (fileType === 'image' || fileType === 'video') {
+    return { metadata, source, type: fileType };
+  }
+
+  return {
+    data: attachment.data,
+    filename,
+    mimeType,
+    type: 'binary',
+  };
+}
+
+function createUserMessageContent(
+  promptText?: string,
+  attachments: AIChatComposerAttachment[] = [],
+) {
+  const text = promptText?.trim();
+  const attachmentContents = attachments
+    .map((attachment) => createAttachmentContent(attachment))
+    .filter((item): item is InputContent => item !== null);
+
+  if (attachmentContents.length === 0) {
+    return text;
+  }
+
+  return [
+    ...(text ? [{ text, type: 'text' as const }] : []),
+    ...attachmentContents,
+  ];
+}
+
 export function buildChatCompletionRequest(
   input: BuildChatCompletionRequestInput,
 ): AIChatCompletionParams {
   const promptText = input.promptText?.trim();
+  const content = createUserMessageContent(promptText, input.attachments);
 
   return {
     conversationId: input.conversationId ?? undefined,
     forwardedProps: toForwardedProps(input.params),
-    messages: promptText
+    messages: content
       ? [
           {
-            content: promptText,
+            content,
             id: `user-draft-${Date.now()}`,
             role: 'user',
           },
@@ -341,10 +468,23 @@ export function buildChatCompletionRequest(
 const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
 
 function joinApiUrl(baseUrl: string, url: string) {
+  if (/^(blob:|data:|https?:\/\/)/iu.test(url)) {
+    return url;
+  }
+
   if (/^https?:\/\//i.test(baseUrl)) {
     return new URL(url, baseUrl).toString();
   }
-  return `${baseUrl.replace(/\/+$/, '')}/${url.replace(/^\/+/, '')}`;
+
+  const normalizedBaseUrl = baseUrl.replace(/\/+$/, '');
+  if (
+    normalizedBaseUrl &&
+    (url === normalizedBaseUrl || url.startsWith(`${normalizedBaseUrl}/`))
+  ) {
+    return url;
+  }
+
+  return `${normalizedBaseUrl}/${url.replace(/^\/+/, '')}`;
 }
 
 export function resolveAIChatTransportUrl(request: AIChatTransportRequest) {

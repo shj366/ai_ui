@@ -3,6 +3,7 @@ import type { BubbleListProps, ConversationsProps } from '@antdv-next/x';
 
 import type { AIModelResult, AIProviderResult } from '../../api';
 import type {
+  AIChatComposerAttachment,
   AIChatComposerParams,
   AIChatConversationResult,
 } from '../../api/chat';
@@ -11,6 +12,7 @@ import type {
   ChatMessageItem,
 } from '../../runtime/message';
 import type { AIChatProviderRequest } from '../../runtime/use-chat-stream';
+import type { AIChatFileMessageBlock } from '../../types/message';
 
 import type { VbenFormSchema } from '#/adapter/form';
 
@@ -461,33 +463,55 @@ async function regenerateMessage(item: ChatMessageItem) {
   await submitChat(item.message_id, false, undefined, 'model');
 }
 
+function createLocalAttachmentBlocks(
+  attachments: AIChatComposerAttachment[],
+): AIChatFileMessageBlock[] {
+  return attachments.map((attachment) => {
+    const mimeType = attachment.mime_type || 'application/octet-stream';
+    return {
+      file_type: attachment.file_type ?? null,
+      mime_type: mimeType,
+      name: attachment.name ?? null,
+      source_type: attachment.source_type ?? null,
+      type: 'file',
+      url:
+        attachment.url ??
+        (attachment.data ? `data:${mimeType};base64,${attachment.data}` : null),
+    };
+  });
+}
+
 async function submitChat(
   regenerateMessageId?: number,
   notifyInvalid = false,
   overridePromptText?: string,
   regenerateSource: 'model' | 'user' = 'model',
+  attachments: AIChatComposerAttachment[] = [],
 ) {
   if (sending.value) {
-    return;
+    return false;
   }
 
   if (!selectedProviderId.value || !selectedModelId.value) {
     if (notifyInvalid) {
       message.warning('请选择供应商和模型');
     }
-    return;
+    return false;
   }
 
   const promptText =
     regenerateMessageId === undefined
       ? (overridePromptText ?? prompt.value).trim()
       : undefined;
+  const submittedAttachments =
+    regenerateMessageId === undefined ? attachments : [];
+  const hasInput = Boolean(promptText) || submittedAttachments.length > 0;
 
-  if (regenerateMessageId === undefined && !promptText) {
+  if (regenerateMessageId === undefined && !hasInput) {
     if (notifyInvalid) {
       message.warning('请输入消息内容');
     }
-    return;
+    return false;
   }
 
   const editingMessageIndex = editingMessage.value?.message_index;
@@ -498,16 +522,17 @@ async function submitChat(
 
   if (editingMessage.value && !hasEditingMessageId) {
     message.warning('当前消息暂不可编辑，请刷新后重试');
-    return;
+    return false;
   }
   let chatMode: AIChatComposerParams['mode'] = 'regenerate';
   if (regenerateMessageId === undefined) {
     chatMode = hasEditingMessageId ? 'edit' : 'create';
   }
-  const submittedTitle =
-    activeConversationId.value || !promptText
-      ? draftConversationTitle.value
-      : makeConversationTitle(promptText);
+  const submittedTitle = activeConversationId.value
+    ? draftConversationTitle.value
+    : makeConversationTitle(
+        promptText || submittedAttachments[0]?.name || '附件消息',
+      );
 
   let payload: AIChatComposerParams;
   try {
@@ -570,13 +595,13 @@ async function submitChat(
     };
   } catch (error) {
     message.error((error as Error).message);
-    return;
+    return false;
   }
 
   const targetConversationId = activeConversationId.value;
   if (regenerateMessageId !== undefined && !targetConversationId) {
     message.warning('当前会话不存在，无法重新生成');
-    return;
+    return false;
   }
   const regenerateTargetMessageIndex = regeneratingMessageIndex.value;
 
@@ -619,6 +644,7 @@ async function submitChat(
   }
   autoFollowMessageScroll.value = true;
   const completionRequest = buildChatCompletionRequest({
+    attachments: submittedAttachments,
     conversationId: targetConversationId,
     params: payload,
     promptText:
@@ -636,8 +662,14 @@ async function submitChat(
     regenerateMessageId === undefined
       ? {
           body: completionRequest,
-          localMessages: submittedPromptText
-            ? [createProviderUserMessage(submittedPromptText)]
+          localMessages: hasInput
+            ? [
+                createProviderUserMessage(
+                  submittedPromptText,
+                  undefined,
+                  createLocalAttachmentBlocks(submittedAttachments),
+                ),
+              ]
             : [],
           mode: 'create',
         }
@@ -713,6 +745,8 @@ async function submitChat(
   editingMessage.value = undefined;
   editingMessageIntent.value = 'save';
   regeneratingMessageIndex.value = undefined;
+
+  return !requestError;
 }
 
 const transientMessages = computed<ChatMessageItem[]>(() => {
@@ -974,8 +1008,13 @@ function handleConversationActiveChange(value: number | string) {
   void selectConversation(String(value));
 }
 
-function handleSenderSubmit(messageText: string) {
-  void submitChat(undefined, true, messageText);
+function handleSenderSubmit(
+  messageText: string,
+  _slotConfig?: unknown,
+  _skill?: unknown,
+  attachments: AIChatComposerAttachment[] = [],
+) {
+  return submitChat(undefined, true, messageText, 'model', attachments);
 }
 
 function handleSenderChange(value: string) {

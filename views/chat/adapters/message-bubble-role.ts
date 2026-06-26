@@ -31,6 +31,7 @@ import {
   Think,
 } from '@antdv-next/x';
 
+import { resolveAIChatApiUrl } from '../../../api/chat';
 import {
   getMessageEventBlocks,
   getMessageFileBlocks,
@@ -382,6 +383,14 @@ function openExternalLink(url: string) {
   window.open(url, '_blank', 'noopener,noreferrer');
 }
 
+function resolveFileRenderUrl(url?: null | string) {
+  if (!url) {
+    return undefined;
+  }
+
+  return resolveAIChatApiUrl(url);
+}
+
 function createFileCardClickHandler(
   dataUrl: boolean,
   fileUrl: string | undefined,
@@ -446,7 +455,7 @@ function toMessageFileCard(
   index: number,
 ): FileCardProps {
   const type = getFileCardType(file);
-  const fileUrl = typeof file.url === 'string' ? file.url : undefined;
+  const fileUrl = resolveFileRenderUrl(file.url);
   const dataUrlInfo = getDataUrlInfo(fileUrl);
   const dataUrl = Boolean(dataUrlInfo);
   const previewableDataUrl =

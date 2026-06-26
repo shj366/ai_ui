@@ -4,6 +4,8 @@ import type { Attachment } from '@antdv-next/x/dist/attachments/index';
 
 import type { VNodeChild } from 'vue';
 
+import type { AIChatComposerAttachment } from '../../../api/chat';
+
 import {
   computed,
   h,
@@ -20,18 +22,35 @@ import {
 import { IconifyIcon } from '@vben/icons';
 
 import { Attachments, Sender, SenderHeader } from '@antdv-next/x';
+import { message } from 'antdv-next';
+
+import { upload_file } from '#/api/core/upload';
+
+import {
+  inferAIChatAttachmentType,
+  resolveAIChatApiUrl,
+} from '../../../api/chat';
 
 defineOptions({
   inheritAttrs: false,
 });
 
-const props =
-  defineProps<
-    Pick<
-      SenderProps,
-      'footer' | 'onCancel' | 'onChange' | 'onKeyDown' | 'onSubmit'
-    >
-  >();
+const props = defineProps<
+  Omit<
+    Pick<SenderProps, 'footer' | 'onCancel' | 'onChange' | 'onKeyDown'>,
+    'onSubmit'
+  > & {
+    onSubmit?: ChatSenderSubmit;
+  }
+>();
+type SenderSubmitArgs = Parameters<NonNullable<SenderProps['onSubmit']>>;
+type ChatSenderSubmit = (
+  message: SenderSubmitArgs[0],
+  slotConfig: SenderSubmitArgs[1],
+  skill: SenderSubmitArgs[2],
+  attachments: AIChatComposerAttachment[],
+) => Promise<unknown> | unknown;
+
 const rootRef = ref<HTMLElement>();
 const senderRef = ref<SenderRef>();
 const attrs = useAttrs();
@@ -41,9 +60,15 @@ const aTooltip = resolveComponent('a-tooltip');
 const attachmentsOpen = ref(false);
 const expanded = ref(false);
 const attachmentItems = shallowRef<Attachment[]>([]);
+const attachmentUploadTasks = new Map<string, Promise<void>>();
+const preparingAttachments = ref(false);
 
 const senderAutoSize = computed<NonNullable<SenderProps['autoSize']>>(() =>
   expanded.value ? { maxRows: 15, minRows: 15 } : { maxRows: 2, minRows: 2 },
+);
+
+const senderLoading = computed(
+  () => Boolean(senderAttrs.value.loading) || preparingAttachments.value,
 );
 
 const attachmentPlaceholder: AttachmentsProps['placeholder'] = (type) =>
@@ -89,11 +114,64 @@ function revokeAttachmentUrl(item: Attachment) {
   }
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object';
+}
+
+function resolveUploadedUrl(value: unknown): null | string {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const resolved = resolveUploadedUrl(item);
+      if (resolved) {
+        return resolved;
+      }
+    }
+    return null;
+  }
+
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  for (const key of [
+    'url',
+    'file_url',
+    'fileUrl',
+    'full_url',
+    'fullUrl',
+    'src',
+    'path',
+    'file_path',
+    'filePath',
+  ]) {
+    const candidate = value[key];
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate.trim();
+    }
+  }
+
+  return resolveUploadedUrl(value.data);
+}
+
+function getAttachmentResponseUrl(item: Attachment) {
+  const url = resolveUploadedUrl(item.response);
+  return url ? resolveAIChatApiUrl(url) : null;
+}
+
 function handleAttachmentChange(info: {
   file: Attachment;
   fileList: Attachment[];
 }) {
   attachmentItems.value = info.fileList.map((item) => {
+    const uploadedUrl = getAttachmentResponseUrl(item);
+    if (uploadedUrl) {
+      revokeAttachmentUrl(item);
+      return {
+        ...item,
+        url: uploadedUrl,
+      };
+    }
+
     if (
       item.uid === info.file.uid &&
       info.file.status !== 'removed' &&
@@ -109,6 +187,42 @@ function handleAttachmentChange(info: {
     return item;
   });
 }
+
+const handleAttachmentUpload: NonNullable<AttachmentsProps['customRequest']> = (
+  options,
+) => {
+  const rawFile = options.file;
+
+  if (!(rawFile instanceof File)) {
+    options.onError?.(new Error('无法读取附件文件'));
+    return;
+  }
+
+  const uid =
+    typeof rawFile === 'object' && 'uid' in rawFile
+      ? String(rawFile.uid)
+      : `${rawFile.name}-${rawFile.lastModified}`;
+  const task = new Promise<void>((resolve) => {
+    void upload_file({
+      file: rawFile,
+      onError: (error) => {
+        options.onError?.(error);
+        resolve();
+      },
+      onProgress: (progress) => {
+        options.onProgress?.(progress);
+      },
+      onSuccess: (data, file) => {
+        options.onSuccess?.(data, file);
+        resolve();
+      },
+    });
+  }).finally(() => {
+    attachmentUploadTasks.delete(uid);
+  });
+
+  attachmentUploadTasks.set(uid, task);
+};
 
 function handleAttachmentRemove(file: Attachment) {
   revokeAttachmentUrl(file);
@@ -129,6 +243,108 @@ function toggleAttachments() {
 function toggleExpanded() {
   expanded.value = !expanded.value;
   void updateSenderTextareaAttrs();
+}
+
+function readFileAsBase64(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.addEventListener('error', () => {
+      reject(reader.error ?? new Error('附件读取失败'));
+    });
+    reader.addEventListener('load', () => {
+      const result = typeof reader.result === 'string' ? reader.result : '';
+      resolve(result.includes(',') ? result.split(',').pop() || '' : result);
+    });
+    reader.readAsDataURL(file);
+  });
+}
+
+function getAttachmentMimeType(item: Attachment, file?: File | null) {
+  return item.type || file?.type || 'application/octet-stream';
+}
+
+function getAttachmentName(item: Attachment, file?: File | null) {
+  return item.name || file?.name || 'attachment';
+}
+
+function getAttachmentUploadTask(item: Attachment) {
+  const fileUid =
+    item.originFileObj && 'uid' in item.originFileObj
+      ? String(item.originFileObj.uid)
+      : item.uid;
+
+  return attachmentUploadTasks.get(fileUid);
+}
+
+async function waitForAttachmentUploads(items: Attachment[]) {
+  const tasks = items
+    .map((item) => getAttachmentUploadTask(item))
+    .filter(Boolean);
+
+  if (tasks.length > 0) {
+    await Promise.allSettled(tasks);
+  }
+}
+
+async function createSubmitAttachment(
+  item: Attachment,
+): Promise<AIChatComposerAttachment | null> {
+  if (item.status === 'removed') {
+    return null;
+  }
+
+  const file = item.originFileObj ?? null;
+  const name = getAttachmentName(item, file);
+  const mimeType = getAttachmentMimeType(item, file);
+  const uploadedUrl = getAttachmentResponseUrl(item);
+  const stableUrl =
+    uploadedUrl ??
+    (typeof item.url === 'string' && !item.url.startsWith('blob:')
+      ? item.url
+      : null);
+
+  if (stableUrl) {
+    return {
+      file_type: inferAIChatAttachmentType(name, mimeType),
+      id: item.uid,
+      mime_type: mimeType,
+      name,
+      size: item.size ?? file?.size ?? null,
+      source_type: 'url',
+      url: stableUrl,
+    };
+  }
+
+  if (!file) {
+    return null;
+  }
+
+  return {
+    data: await readFileAsBase64(file),
+    file_type: inferAIChatAttachmentType(name, mimeType),
+    id: item.uid,
+    mime_type: mimeType,
+    name,
+    size: item.size ?? file.size ?? null,
+    source_type: 'base64',
+  };
+}
+
+async function createSubmitAttachments() {
+  const items = attachmentItems.value.filter(
+    (item) => item.status !== 'removed',
+  );
+
+  await waitForAttachmentUploads(items);
+
+  const attachments = await Promise.all(
+    items.map((item) => createSubmitAttachment(item)),
+  );
+
+  return attachments.filter(
+    (attachment): attachment is AIChatComposerAttachment => attachment !== null,
+  );
 }
 
 function handleKeyDown(event: KeyboardEvent) {
@@ -154,10 +370,30 @@ function handleCancel() {
   props.onCancel?.();
 }
 
-const handleSubmit: NonNullable<SenderProps['onSubmit']> = (...args) => {
-  props.onSubmit?.(...args);
-  clearAttachments();
-  attachmentsOpen.value = false;
+const handleSubmit: NonNullable<SenderProps['onSubmit']> = async (...args) => {
+  if (preparingAttachments.value) {
+    return;
+  }
+
+  preparingAttachments.value = true;
+  try {
+    const attachments = await createSubmitAttachments();
+    const shouldClear = await props.onSubmit?.(
+      args[0],
+      args[1],
+      args[2],
+      attachments,
+    );
+
+    if (shouldClear !== false) {
+      clearAttachments();
+      attachmentsOpen.value = false;
+    }
+  } catch (error) {
+    message.error((error as Error).message || '附件处理失败');
+  } finally {
+    preparingAttachments.value = false;
+  }
 };
 
 function renderFooterIconButton(options: {
@@ -260,6 +496,7 @@ onBeforeUnmount(() => {
       v-bind="senderAttrs"
       :auto-size="senderAutoSize"
       :footer="renderSenderFooter"
+      :loading="senderLoading"
       :on-cancel="handleCancel"
       :on-change="handleChange"
       :on-key-down="handleKeyDown"
@@ -283,7 +520,7 @@ onBeforeUnmount(() => {
         >
           <Attachments
             accept="image/*,audio/*,video/*,.csv,.doc,.docx,.json,.md,.pdf,.txt,.xlsx"
-            :before-upload="() => false"
+            :custom-request="handleAttachmentUpload"
             :get-drop-container="() => senderRef?.nativeElement"
             :items="attachmentItems"
             multiple

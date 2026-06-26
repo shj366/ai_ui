@@ -255,9 +255,19 @@ export function createProviderSeedMessage(
 export function createProviderUserMessage(
   content: string,
   createdTime = new Date().toISOString(),
+  files: AIChatFileMessageBlock[] = [],
 ): AIChatProviderMessage {
+  const blocks: AIChatMessageBlock[] = [];
+  const text = content.trim();
+
+  if (text) {
+    blocks.push(createTextBlock(text));
+  }
+
+  blocks.push(...files.map((file) => normalizeAIChatFileBlock(file)));
+
   return {
-    blocks: [createTextBlock(content)],
+    blocks,
     created_time: createdTime,
     message_type: 'normal',
     role: 'user',
