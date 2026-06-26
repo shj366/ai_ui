@@ -391,177 +391,244 @@ const passthroughFields: TextareaFieldConfig[] = [
 </script>
 
 <template>
-  <a-tabs
-    v-model:active-key="activeSettingsTabKey"
-    :tab-bar-style="settingsTabBarStyle"
-    size="large"
-  >
-    <a-tab-pane v-if="!isImageGeneration" key="generation" tab="生成控制">
-      <a-flex vertical gap="middle">
-        <a-alert
-          show-icon
-          title="控制输出的稳定性、候选范围和回答长度"
-          type="info"
-        />
-        <a-card size="small" title="采样与长度">
-          <a-form layout="vertical">
-            <a-row :gutter="[16, 16]">
-              <a-col
-                v-for="field in generationFields"
-                :key="field.key"
-                :md="12"
-                :span="24"
-              >
-                <a-form-item :label="field.label" :tooltip="field.tip">
-                  <a-input-number
-                    :value="field.model.value"
-                    :max="field.max"
-                    :min="field.min"
-                    :placeholder="field.placeholder"
-                    :step="field.step"
-                    :style="{ width: '100%' }"
-                    @update:value="field.model.value = $event"
+  <div class="h-full min-h-0 w-full flex-1 overflow-hidden">
+    <a-tabs
+      v-model:active-key="activeSettingsTabKey"
+      class="chat-settings-tabs h-full min-h-0"
+      :styles="{
+        root: {
+          height: '100%',
+          overflow: 'hidden',
+        },
+        content: {
+          height: '100%',
+          minHeight: 0,
+          overflow: 'hidden',
+        },
+        header: {
+          alignSelf: 'stretch',
+          flex: '0 0 132px',
+          maxHeight: '100%',
+          minWidth: '132px',
+          overflow: 'hidden',
+        },
+      }"
+      :tab-bar-style="settingsTabBarStyle"
+      tab-placement="start"
+    >
+      <a-tab-pane v-if="!isImageGeneration" key="generation" tab="生成控制">
+        <div class="chat-settings-pane">
+          <a-flex vertical gap="middle">
+            <a-alert
+              show-icon
+              title="控制输出的稳定性、候选范围和回答长度"
+              type="info"
+            />
+            <a-card size="small" title="采样与长度">
+              <a-form layout="vertical">
+                <a-row :gutter="[16, 16]">
+                  <a-col
+                    v-for="field in generationFields"
+                    :key="field.key"
+                    :md="12"
+                    :span="24"
+                  >
+                    <a-form-item :label="field.label" :tooltip="field.tip">
+                      <a-input-number
+                        :value="field.model.value"
+                        :max="field.max"
+                        :min="field.min"
+                        :placeholder="field.placeholder"
+                        :step="field.step"
+                        :style="{ width: '100%' }"
+                        @update:value="field.model.value = $event"
+                      />
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+              </a-form>
+            </a-card>
+          </a-flex>
+        </div>
+      </a-tab-pane>
+
+      <a-tab-pane v-if="!isImageGeneration" key="behavior" tab="行为控制">
+        <div class="chat-settings-pane">
+          <a-flex vertical gap="middle">
+            <a-alert show-icon title="调整回复的复现性与重复倾向" type="info" />
+            <a-card size="small" title="复现与惩罚参数">
+              <a-form layout="vertical">
+                <a-row :gutter="[16, 16]">
+                  <a-col
+                    v-for="field in behaviorFields"
+                    :key="field.key"
+                    :md="field.wide ? 24 : 12"
+                    :span="24"
+                  >
+                    <a-form-item :label="field.label" :tooltip="field.tip">
+                      <a-input-number
+                        :value="field.model.value"
+                        :max="field.max"
+                        :min="field.min"
+                        :placeholder="field.placeholder"
+                        :step="field.step"
+                        :style="{ width: '100%' }"
+                        @update:value="field.model.value = $event"
+                      />
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+              </a-form>
+            </a-card>
+          </a-flex>
+        </div>
+      </a-tab-pane>
+
+      <a-tab-pane key="image" tab="图片生成">
+        <div class="chat-settings-pane">
+          <a-flex vertical gap="middle">
+            <a-alert
+              show-icon
+              title="仅在生成类型为图片时生效，未填写的参数由后端或模型决定"
+              type="info"
+            />
+            <a-card size="small" title="图像模型与输出">
+              <a-form layout="vertical">
+                <a-form-item
+                  label="Image Model"
+                  tooltip="图片生成底层模型；不填时由后端选择当前供应商的默认图片模型"
+                >
+                  <a-input
+                    :value="imageModel"
+                    placeholder="例如 gpt-image-1"
+                    @update:value="imageModel = String($event ?? '')"
                   />
                 </a-form-item>
-              </a-col>
-            </a-row>
-          </a-form>
-        </a-card>
-      </a-flex>
-    </a-tab-pane>
+                <a-row :gutter="[16, 16]">
+                  <a-col
+                    v-for="field in imageSelectFields"
+                    :key="field.key"
+                    :md="12"
+                    :span="24"
+                  >
+                    <a-form-item :label="field.label" :tooltip="field.tip">
+                      <a-select
+                        :value="field.model.value"
+                        :allow-clear="true"
+                        :options="field.options"
+                        :placeholder="field.placeholder"
+                        @update:value="updateSelectField(field, $event)"
+                      />
+                    </a-form-item>
+                  </a-col>
+                  <a-col
+                    v-for="field in imageNumberFields"
+                    :key="field.key"
+                    :md="12"
+                    :span="24"
+                  >
+                    <a-form-item :label="field.label" :tooltip="field.tip">
+                      <a-input-number
+                        :value="field.model.value"
+                        :max="field.max"
+                        :min="field.min"
+                        :placeholder="field.placeholder"
+                        :step="field.step"
+                        :style="{ width: '100%' }"
+                        @update:value="field.model.value = $event"
+                      />
+                    </a-form-item>
+                  </a-col>
+                </a-row>
+              </a-form>
+            </a-card>
+          </a-flex>
+        </div>
+      </a-tab-pane>
 
-    <a-tab-pane v-if="!isImageGeneration" key="behavior" tab="行为控制">
-      <a-flex vertical gap="middle">
-        <a-alert show-icon title="调整回复的复现性与重复倾向" type="info" />
-        <a-card size="small" title="复现与惩罚参数">
-          <a-form layout="vertical">
-            <a-row :gutter="[16, 16]">
-              <a-col
-                v-for="field in behaviorFields"
-                :key="field.key"
-                :md="field.wide ? 24 : 12"
-                :span="24"
-              >
-                <a-form-item :label="field.label" :tooltip="field.tip">
-                  <a-input-number
-                    :value="field.model.value"
-                    :max="field.max"
-                    :min="field.min"
-                    :placeholder="field.placeholder"
-                    :step="field.step"
-                    :style="{ width: '100%' }"
-                    @update:value="field.model.value = $event"
+      <a-tab-pane v-if="!isImageGeneration" key="tools" tab="工具能力">
+        <div class="chat-settings-pane">
+          <a-flex vertical gap="middle">
+            <a-alert
+              show-icon
+              title="控制模型是否可以调用工具"
+              type="warning"
+            />
+            <a-card size="small" title="工具调用">
+              <a-form layout="vertical">
+                <a-form-item
+                  v-for="field in toolFields"
+                  :key="field.key"
+                  :label="field.label"
+                  :tooltip="field.tip"
+                >
+                  <a-switch
+                    :checked="field.model.value"
+                    @update:checked="field.model.value = Boolean($event)"
                   />
                 </a-form-item>
-              </a-col>
-            </a-row>
-          </a-form>
-        </a-card>
-      </a-flex>
-    </a-tab-pane>
+              </a-form>
+            </a-card>
+          </a-flex>
+        </div>
+      </a-tab-pane>
 
-    <a-tab-pane key="image" tab="图片生成">
-      <a-flex vertical gap="middle">
-        <a-alert
-          show-icon
-          title="仅在生成类型为图片时生效，未填写的参数由后端或模型决定"
-          type="info"
-        />
-        <a-card size="small" title="图像模型与输出">
-          <a-form layout="vertical">
-            <a-form-item
-              label="Image Model"
-              tooltip="图片生成底层模型；不填时由后端选择当前供应商的默认图片模型"
-            >
-              <a-input
-                :value="imageModel"
-                placeholder="例如 gpt-image-1"
-                @update:value="imageModel = String($event ?? '')"
-              />
-            </a-form-item>
-            <a-row :gutter="[16, 16]">
-              <a-col
-                v-for="field in imageSelectFields"
-                :key="field.key"
-                :md="12"
-                :span="24"
-              >
-                <a-form-item :label="field.label" :tooltip="field.tip">
-                  <a-select
-                    :value="field.model.value"
-                    :allow-clear="true"
-                    :options="field.options"
+      <a-tab-pane v-if="!isImageGeneration" key="passthrough" tab="请求透传">
+        <div class="chat-settings-pane">
+          <a-flex vertical gap="middle">
+            <a-alert show-icon title="高级请求参数" type="warning" />
+            <a-card size="small" title="JSON 透传">
+              <a-form layout="vertical">
+                <a-form-item
+                  v-for="field in passthroughFields"
+                  :key="field.key"
+                  :label="field.label"
+                  :tooltip="field.tip"
+                >
+                  <a-textarea
+                    :value="String(field.model.value ?? '')"
+                    :auto-size="{
+                      minRows: field.minRows,
+                      maxRows: field.maxRows,
+                    }"
                     :placeholder="field.placeholder"
-                    @update:value="updateSelectField(field, $event)"
+                    @update:value="field.model.value = String($event ?? '')"
                   />
                 </a-form-item>
-              </a-col>
-              <a-col
-                v-for="field in imageNumberFields"
-                :key="field.key"
-                :md="12"
-                :span="24"
-              >
-                <a-form-item :label="field.label" :tooltip="field.tip">
-                  <a-input-number
-                    :value="field.model.value"
-                    :max="field.max"
-                    :min="field.min"
-                    :placeholder="field.placeholder"
-                    :step="field.step"
-                    :style="{ width: '100%' }"
-                    @update:value="field.model.value = $event"
-                  />
-                </a-form-item>
-              </a-col>
-            </a-row>
-          </a-form>
-        </a-card>
-      </a-flex>
-    </a-tab-pane>
-
-    <a-tab-pane v-if="!isImageGeneration" key="tools" tab="工具能力">
-      <a-flex vertical gap="middle">
-        <a-alert show-icon title="控制模型是否可以调用工具" type="warning" />
-        <a-card size="small" title="工具调用">
-          <a-form layout="vertical">
-            <a-form-item
-              v-for="field in toolFields"
-              :key="field.key"
-              :label="field.label"
-              :tooltip="field.tip"
-            >
-              <a-switch
-                :checked="field.model.value"
-                @update:checked="field.model.value = Boolean($event)"
-              />
-            </a-form-item>
-          </a-form>
-        </a-card>
-      </a-flex>
-    </a-tab-pane>
-
-    <a-tab-pane v-if="!isImageGeneration" key="passthrough" tab="请求透传">
-      <a-flex vertical gap="middle">
-        <a-alert show-icon title="高级请求参数" type="warning" />
-        <a-card size="small" title="JSON 透传">
-          <a-form layout="vertical">
-            <a-form-item
-              v-for="field in passthroughFields"
-              :key="field.key"
-              :label="field.label"
-              :tooltip="field.tip"
-            >
-              <a-textarea
-                :value="String(field.model.value ?? '')"
-                :auto-size="{ minRows: field.minRows, maxRows: field.maxRows }"
-                :placeholder="field.placeholder"
-                @update:value="field.model.value = String($event ?? '')"
-              />
-            </a-form-item>
-          </a-form>
-        </a-card>
-      </a-flex>
-    </a-tab-pane>
-  </a-tabs>
+              </a-form>
+            </a-card>
+          </a-flex>
+        </div>
+      </a-tab-pane>
+    </a-tabs>
+  </div>
 </template>
+
+<style scoped>
+.chat-settings-tabs :deep(.ant-tabs-content-holder) {
+  flex: 1 1 0;
+  height: 100%;
+  min-height: 0;
+  max-height: 100%;
+  overflow: hidden;
+}
+
+.chat-settings-tabs :deep(.ant-tabs-content),
+.chat-settings-tabs :deep(.ant-tabs-tabpane) {
+  height: 100%;
+  min-height: 0;
+}
+
+.chat-settings-pane {
+  height: 100%;
+  max-height: 100%;
+  padding-right: 12px;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+}
+
+.chat-settings-tabs :deep(.ant-tabs-nav),
+.chat-settings-tabs :deep(.ant-tabs-nav-wrap) {
+  max-height: 100%;
+}
+</style>

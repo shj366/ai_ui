@@ -1,6 +1,6 @@
 import type { SenderProps } from '@antdv-next/x';
 
-import type { Ref } from 'vue';
+import type { Ref, VNodeChild } from 'vue';
 
 import type {
   AIChatComposerParams,
@@ -12,7 +12,7 @@ import { h, ref, resolveComponent } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 
-import { getAllAIQuickPhraseApi } from '../../../api';
+import { getAllAIMcpApi, getAllAIQuickPhraseApi } from '../../../api';
 
 interface SenderToolbarOption {
   desc?: string;
@@ -22,11 +22,21 @@ interface SenderToolbarOption {
   title?: string;
 }
 
+type SenderFooterRender = Extract<
+  NonNullable<SenderProps['footer']>,
+  (...args: any[]) => any
+>;
+
+type SenderFooterComponents =
+  Parameters<SenderFooterRender>[1]['components'] & {
+    AttachmentButton?: () => VNodeChild;
+    ExpandButton?: () => VNodeChild;
+  };
+
 export interface UseSenderToolbarOptions {
   activeConversationId: Ref<string>;
   canClearMessages: Ref<boolean>;
   canCreateNewConversation: Ref<boolean>;
-  composerHint: Ref<string>;
   confirmClearConversationContext: () => void;
   confirmClearMessages: () => void;
   createNewConversation: () => void;
@@ -39,12 +49,9 @@ export interface UseSenderToolbarOptions {
     value: string;
   }>;
   hasAdvancedSettings: Ref<boolean>;
-  mcps: Ref<AIMcpResult[]>;
   onOpenSettings: () => void;
-  prompt: Ref<string>;
+  onSelectQuickPhrase: (item: AIQuickPhraseResult) => void;
   selectedMcpIds: Ref<number[]>;
-  selectedModelId: Ref<string | undefined>;
-  selectedProviderId: Ref<number | undefined>;
   sending: Ref<boolean>;
   thinking: Ref<AIChatComposerParams['thinking']>;
   thinkingButtonLabel: Ref<string>;
@@ -71,7 +78,6 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
   const {
     canClearMessages,
     canCreateNewConversation,
-    composerHint,
     confirmClearConversationContext,
     confirmClearMessages,
     createNewConversation,
@@ -79,12 +85,9 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
     generationTypeButtonLabel,
     GENERATION_TYPE_OPTIONS,
     hasAdvancedSettings,
-    mcps,
     onOpenSettings,
-    prompt,
+    onSelectQuickPhrase,
     selectedMcpIds,
-    selectedModelId,
-    selectedProviderId,
     sending,
     thinking,
     thinkingButtonLabel,
@@ -95,32 +98,16 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
     activeConversationId,
   } = options;
 
-  const quickPhrasePopoverOpen = ref(false);
-  const quickPhrases = ref<AIQuickPhraseResult[]>([]);
-  const quickPhraseLoading = ref(false);
+  const mcps = ref<AIMcpResult[]>([]);
+  const mcpLoading = ref(false);
 
-  async function fetchQuickPhrases() {
-    quickPhraseLoading.value = true;
+  async function fetchMcps() {
+    mcpLoading.value = true;
     try {
-      quickPhrases.value = await getAllAIQuickPhraseApi();
+      mcps.value = await getAllAIMcpApi();
     } finally {
-      quickPhraseLoading.value = false;
+      mcpLoading.value = false;
     }
-  }
-
-  function appendQuickPhrase(item: AIQuickPhraseResult) {
-    prompt.value = prompt.value.trim()
-      ? `${prompt.value.trim()}\n${item.content}`
-      : item.content;
-  }
-
-  function handleQuickPhraseSelect(item: AIQuickPhraseResult) {
-    appendQuickPhrase(item);
-    quickPhrasePopoverOpen.value = false;
-  }
-
-  function handleQuickPhrasePopoverOpenChange(open: boolean) {
-    quickPhrasePopoverOpen.value = open;
   }
 
   function isMcpSelected(mcpId: number) {
@@ -367,25 +354,51 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
     return item.description || item.command || item.url || `MCP #${item.id}`;
   }
 
+  const quickPhrasePopoverOpen = ref(false);
+  const quickPhrases = ref<AIQuickPhraseResult[]>([]);
+  const quickPhraseLoading = ref(false);
+
+  async function fetchQuickPhrases() {
+    quickPhraseLoading.value = true;
+    try {
+      quickPhrases.value = await getAllAIQuickPhraseApi();
+    } finally {
+      quickPhraseLoading.value = false;
+    }
+  }
+
+  function handleQuickPhraseSelect(item: AIQuickPhraseResult) {
+    onSelectQuickPhrase(item);
+    quickPhrasePopoverOpen.value = false;
+  }
+
+  function handleQuickPhrasePopoverOpenChange(open: boolean) {
+    quickPhrasePopoverOpen.value = open;
+  }
+
   function renderMcpPopoverContent() {
-    const content =
-      mcps.value.length === 0
-        ? h(aEmpty, {
-            description: '暂无可用 MCP',
-            image: null,
-          })
-        : renderOptionList(
-            mcps.value.map((item) => ({
-              desc: getMcpDescription(item),
-              key: String(item.id),
-              label: item.name,
-              onClick: () => {
-                toggleMcpSelection(item.id);
-              },
-              selected: isMcpSelected(item.id),
-            })),
-            'min(320px, 60vh)',
-          );
+    let content;
+    if (mcpLoading.value) {
+      content = h(aSpin, { size: 'small' });
+    } else if (mcps.value.length === 0) {
+      content = h(aEmpty, {
+        description: '暂无可用 MCP',
+        image: null,
+      });
+    } else {
+      content = renderOptionList(
+        mcps.value.map((item) => ({
+          desc: getMcpDescription(item),
+          key: String(item.id),
+          label: item.name,
+          onClick: () => {
+            toggleMcpSelection(item.id);
+          },
+          selected: isMcpSelected(item.id),
+        })),
+        'min(320px, 60vh)',
+      );
+    }
 
     return renderPopoverContent(content, 320);
   }
@@ -417,8 +430,12 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
     return renderPopoverContent(quickPhraseContent, 320);
   }
 
-  const renderSenderFooter: NonNullable<SenderProps['footer']> = (_, info) => {
-    const { LoadingButton, SendButton } = info.components;
+  const renderSenderFooter: NonNullable<SenderProps['footer']> = (
+    defaultNode,
+    info,
+  ) => {
+    const { AttachmentButton, ExpandButton } =
+      info.components as SenderFooterComponents;
     const thinkingButtonTitle = `思考：${thinkingButtonLabel.value}`;
 
     return h(
@@ -447,6 +464,7 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
                   onClick: createNewConversation,
                   title: '新建话题',
                 }),
+                AttachmentButton ? h(AttachmentButton) : null,
                 h(
                   aPopover,
                   { placement: 'topLeft', title: '生成类型', trigger: 'click' },
@@ -540,6 +558,7 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
                     ? '参数设置（已调整）'
                     : '参数设置',
                 }),
+                ExpandButton ? h(ExpandButton) : null,
                 renderFooterIconButton({
                   disabled: !canClearMessages.value,
                   icon: 'mdi:eraser-variant',
@@ -569,34 +588,7 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
               wrap: 'wrap',
             },
             {
-              default: () => [
-                composerHint.value
-                  ? h(
-                      'span',
-                      {
-                        class:
-                          'inline-flex max-w-full whitespace-pre-wrap text-left text-xs leading-5 text-muted-foreground',
-                      },
-                      composerHint.value,
-                    )
-                  : null,
-                sending.value
-                  ? h(LoadingButton, {
-                      type: 'default',
-                    })
-                  : h(SendButton, {
-                      disabled:
-                        !selectedProviderId.value ||
-                        !selectedModelId.value ||
-                        !prompt.value.trim(),
-                      icon: h(IconifyIcon, {
-                        class: 'size-4',
-                        icon: 'mdi:send',
-                      }),
-                      shape: 'default',
-                      type: 'text',
-                    }),
-              ],
+              default: () => [defaultNode],
             },
           ),
         ],
@@ -605,10 +597,8 @@ export function useSenderToolbar(options: UseSenderToolbarOptions) {
   };
 
   return {
+    fetchMcps,
     fetchQuickPhrases,
-    handleQuickPhrasePopoverOpenChange,
-    quickPhrasePopoverOpen,
-    quickPhrases,
     renderSenderFooter,
   };
 }

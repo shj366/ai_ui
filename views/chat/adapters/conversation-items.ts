@@ -13,6 +13,8 @@ import {
   PinOff,
 } from '@vben/icons';
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 function renderConversationLabel(conversation: AIChatConversationResult) {
   return h('div', { class: 'min-w-0 pr-8' }, [
     h('div', { class: 'flex min-w-0 items-center gap-1.5' }, [
@@ -33,10 +35,42 @@ function renderConversationLabel(conversation: AIChatConversationResult) {
   ]);
 }
 
+function startOfLocalDay(date: Date) {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate());
+}
+
+function getConversationTime(conversation: AIChatConversationResult) {
+  const value = conversation.updated_time || conversation.created_time;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? new Date(0) : date;
+}
+
+function getConversationGroup(conversation: AIChatConversationResult) {
+  if (conversation.is_pinned) {
+    return '置顶';
+  }
+
+  const today = startOfLocalDay(new Date());
+  const target = startOfLocalDay(getConversationTime(conversation));
+  const diffDays = Math.floor((today.getTime() - target.getTime()) / DAY_MS);
+
+  if (diffDays <= 0) {
+    return '今天';
+  }
+  if (diffDays === 1) {
+    return '昨天';
+  }
+  if (diffDays < 7) {
+    return '近 7 天';
+  }
+  return '更早';
+}
+
 export function buildConversationSidebarItems(
   conversations: AIChatConversationResult[],
 ): ConversationsProps['items'] {
   return conversations.map((conversation) => ({
+    group: getConversationGroup(conversation),
     key: conversation.conversation_id,
     label: renderConversationLabel(conversation),
   }));

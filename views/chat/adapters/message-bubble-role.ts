@@ -5,7 +5,6 @@ import type {
   BubbleProps,
   FileCardProps,
   SourcesProps,
-  ThoughtChainItemType,
 } from '@antdv-next/x';
 
 import type { Component, VNodeChild } from 'vue';
@@ -30,7 +29,6 @@ import {
   FileCardList,
   Sources,
   Think,
-  ThoughtChain,
 } from '@antdv-next/x';
 
 import {
@@ -868,9 +866,11 @@ function renderEventContent(
   return h('div', { class: 'min-w-0 space-y-2' }, children);
 }
 
-function toThoughtChainStatus(
+type EventStepStatus = 'abort' | 'error' | 'loading' | 'success' | 'wait';
+
+function toEventStepStatus(
   status: AIChatEventMessageBlock['status'],
-): ThoughtChainItemType['status'] {
+): EventStepStatus {
   switch (status) {
     case 'abort': {
       return 'abort';
@@ -885,7 +885,7 @@ function toThoughtChainStatus(
       return 'success';
     }
     default: {
-      return undefined;
+      return 'wait';
     }
   }
 }
@@ -934,28 +934,7 @@ function getEventDisplayDescription(item: AIChatEventMessageBlock) {
   return item.summary || item.title;
 }
 
-function buildThoughtChainItem(
-  item: AIChatEventMessageBlock,
-  title: string,
-  status: ThoughtChainItemType['status'],
-  content?: VNodeChild,
-  keySuffix = '',
-): ThoughtChainItemType {
-  const key = item.event_key || item.event_type;
-
-  return {
-    blink: status === 'loading',
-    collapsible: Boolean(content),
-    content,
-    description: getEventDisplayDescription(item),
-    icon: renderThoughtChainStatusIcon(status),
-    key: keySuffix ? `${key}-${keySuffix}` : key,
-    status,
-    title,
-  };
-}
-
-function renderThoughtChainStatusIcon(status: ThoughtChainItemType['status']) {
+function renderEventStepStatusIcon(status: EventStepStatus) {
   switch (status) {
     case 'abort': {
       return h(IconifyIcon, {
@@ -971,7 +950,7 @@ function renderThoughtChainStatusIcon(status: ThoughtChainItemType['status']) {
     }
     case 'loading': {
       return h(IconifyIcon, {
-        class: 'size-3.5 text-primary',
+        class: 'size-3.5 animate-spin text-primary',
         icon: 'mdi:loading',
       });
     }
@@ -990,84 +969,140 @@ function renderThoughtChainStatusIcon(status: ThoughtChainItemType['status']) {
   }
 }
 
-function getCompletedToolPhaseStatus(
-  item: AIChatEventMessageBlock,
-): ThoughtChainItemType['status'] {
-  if (item.status === 'abort' || item.status === 'error') {
-    return toThoughtChainStatus(item.status);
+function getEventStepIcon(item: AIChatEventMessageBlock) {
+  if (eventBlockHasAnyType(item, TOOL_CALL_ARG_EVENT_TYPES)) {
+    return 'mdi:code-json';
   }
 
-  return 'success';
+  if (eventBlockHasAnyType(item, TOOL_CALL_RESULT_EVENT_TYPES)) {
+    return 'mdi:file-document-check-outline';
+  }
+
+  if (eventBlockHasAnyType(item, TOOL_CALL_END_EVENT_TYPES)) {
+    return 'mdi:check-decagram-outline';
+  }
+
+  if (eventBlockHasAnyType(item, TOOL_CALL_EVENT_TYPES)) {
+    return 'mdi:tools';
+  }
+
+  if (eventBlockHasAnyType(item, ACTIVITY_EVENT_TYPES)) {
+    return 'mdi:run-fast';
+  }
+
+  return 'mdi:progress-clock';
 }
 
-function getCurrentToolPhaseStatus(
-  item: AIChatEventMessageBlock,
-): ThoughtChainItemType['status'] {
-  return toThoughtChainStatus(item.status) ?? 'success';
+function renderEventStepIcon(item: AIChatEventMessageBlock) {
+  return h(IconifyIcon, {
+    class: 'size-3.5 text-muted-foreground',
+    icon: getEventStepIcon(item),
+  });
 }
 
-function renderToolCallThoughtItems(
+function getEventStepStatusClass(status: EventStepStatus) {
+  switch (status) {
+    case 'error': {
+      return 'border-destructive/30 bg-destructive/5';
+    }
+    case 'loading': {
+      return 'border-primary/30 bg-primary/5';
+    }
+    case 'success': {
+      return 'border-emerald-500/25 bg-emerald-500/5';
+    }
+    default: {
+      return 'border-border/70 bg-background/70';
+    }
+  }
+}
+
+function renderEventStepHeader(
   item: AIChatEventMessageBlock,
-  content: VNodeChild,
+  status: EventStepStatus,
+  collapsible: boolean,
 ) {
-  const hasArgs = eventBlockHasAnyType(item, TOOL_CALL_ARG_EVENT_TYPES);
-  const hasResult = eventBlockHasAnyType(item, TOOL_CALL_RESULT_EVENT_TYPES);
-  const hasEnd = eventBlockHasAnyType(item, TOOL_CALL_END_EVENT_TYPES);
-  const currentStatus = getCurrentToolPhaseStatus(item);
-  const completedStatus = getCompletedToolPhaseStatus(item);
-  const items: ThoughtChainItemType[] = [];
+  const description = getEventDisplayDescription(item);
+  const title = getEventDisplayTitle(item);
+  const shouldShowDescription = Boolean(description && description !== title);
 
-  items.push(
-    buildThoughtChainItem(
-      item,
-      '调用工具',
-      hasArgs || hasResult || hasEnd ? 'success' : currentStatus,
-      item.event_type === 'TOOL_CALL_START' ? content : undefined,
-      'start',
-    ),
+  return h('div', { class: 'flex min-w-0 items-center gap-2' }, [
+    h('span', { class: 'inline-flex shrink-0' }, [renderEventStepIcon(item)]),
+    h('div', { class: 'min-w-0 flex-1' }, [
+      h('div', { class: 'flex min-w-0 items-center gap-2' }, [
+        h(
+          'span',
+          { class: 'truncate text-xs font-medium text-foreground' },
+          title,
+        ),
+        shouldShowDescription
+          ? h(
+              'span',
+              {
+                class:
+                  'max-w-[160px] truncate rounded bg-muted/60 px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground',
+              },
+              description,
+            )
+          : null,
+        status === 'loading'
+          ? h('span', { class: 'text-[11px] text-primary' }, '执行中')
+          : null,
+      ]),
+    ]),
+    h('span', { class: 'inline-flex shrink-0' }, [
+      collapsible
+        ? h(IconifyIcon, {
+            class:
+              'size-3.5 text-muted-foreground transition-transform group-open:rotate-180',
+            icon: 'mdi:chevron-down',
+          })
+        : renderEventStepStatusIcon(status),
+    ]),
+  ]);
+}
+
+function renderEventStep(item: AIChatEventMessageBlock, content: VNodeChild) {
+  const status = toEventStepStatus(item.status);
+  const collapsible = Boolean(content);
+  const className = [
+    'group min-w-0 rounded-lg border px-3 py-2 transition-colors',
+    getEventStepStatusClass(status),
+  ];
+
+  if (!collapsible) {
+    return h(
+      'div',
+      {
+        key: `${item.event_key || item.event_type}:${item.event_type}`,
+        class: className,
+      },
+      [renderEventStepHeader(item, status, false)],
+    );
+  }
+
+  return h(
+    'details',
+    {
+      key: `${item.event_key || item.event_type}:${item.event_type}`,
+      class: className,
+    },
+    [
+      h(
+        'summary',
+        {
+          class: 'cursor-pointer list-none [&::-webkit-details-marker]:hidden',
+        },
+        [renderEventStepHeader(item, status, true)],
+      ),
+      h('div', { class: 'mt-2 min-w-0 border-t border-border/60 pt-2' }, [
+        content,
+      ]),
+    ],
   );
-
-  if (hasArgs) {
-    items.push(
-      buildThoughtChainItem(
-        item,
-        '传入工具参数',
-        hasResult || hasEnd ? 'success' : currentStatus,
-        TOOL_CALL_ARG_EVENT_TYPES.has(item.event_type) ? content : undefined,
-        'args',
-      ),
-    );
-  }
-
-  if (hasResult) {
-    items.push(
-      buildThoughtChainItem(
-        item,
-        '读取工具结果',
-        hasEnd ? completedStatus : currentStatus,
-        item.event_type === 'TOOL_CALL_RESULT' ? content : undefined,
-        'result',
-      ),
-    );
-  }
-
-  if (hasEnd) {
-    items.push(
-      buildThoughtChainItem(
-        item,
-        '工具调用完成',
-        completedStatus,
-        item.event_type === 'TOOL_CALL_END' ? content : undefined,
-        'end',
-      ),
-    );
-  }
-
-  return items;
 }
 
 function renderMessageEvents(
-  message: ChatMessageItem,
   events: AIChatEventMessageBlock[],
   MarkdownContent: ReturnType<typeof createMarkdownContentRenderer>,
   isDark: boolean,
@@ -1076,75 +1111,25 @@ function renderMessageEvents(
     return null;
   }
 
-  const thoughtItems = events.flatMap((item) => {
-    const content = renderEventContent(item, MarkdownContent, isDark);
-    const status = toThoughtChainStatus(item.status);
-
-    if (eventBlockHasAnyType(item, TOOL_CALL_EVENT_TYPES)) {
-      return renderToolCallThoughtItems(item, content);
-    }
-
-    return [
-      buildThoughtChainItem(item, getEventDisplayTitle(item), status, content),
-    ];
-  });
-
-  const expandedKeys = thoughtItems
-    .filter((item) => item.status === 'loading' || item.status === 'error')
-    .map((item) => item.key)
-    .filter((key): key is string => typeof key === 'string');
-
   return h(
     'div',
-    {
-      key: `${message.id}-events`,
-      class:
-        'min-w-0 max-w-full rounded-2xl border border-border/70 bg-muted/20 px-3 py-3 shadow-sm dark:bg-muted/10',
-    },
-    [
-      h(
-        'div',
-        {
-          class:
-            'mb-2 inline-flex items-center gap-1.5 text-xs font-medium leading-none text-muted-foreground',
-        },
-        [
-          h(IconifyIcon, {
-            class: 'size-3.5',
-            icon: message.streaming
-              ? 'mdi:progress-clock'
-              : 'mdi:timeline-check-outline',
-          }),
-          '执行过程',
-        ],
-      ),
-      h(ThoughtChain, {
-        defaultExpandedKeys: expandedKeys,
-        items: thoughtItems,
-        line: 'dashed',
-      }),
-    ],
+    { class: 'min-w-0 max-w-full space-y-2' },
+    events.map((item) =>
+      renderEventStep(item, renderEventContent(item, MarkdownContent, isDark)),
+    ),
   );
 }
 
-function renderAssistantPending() {
-  return h(
-    'div',
-    {
-      'aria-label': '加载中',
-      class:
-        'inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-muted/35 px-2.5 py-2 text-muted-foreground',
-      role: 'status',
-    },
-    [
-      h('span', { class: 'size-1.5 animate-pulse rounded-full bg-current' }),
-      h('span', {
-        class: 'size-1.5 animate-pulse rounded-full bg-current delay-150',
-      }),
-      h('span', {
-        class: 'size-1.5 animate-pulse rounded-full bg-current delay-300',
-      }),
-    ],
+function isAssistantMessageLoading(message: ChatMessageItem) {
+  if (message.role !== 'assistant' || !message.streaming) {
+    return false;
+  }
+
+  return !(
+    getMessageTextContent(message, 'text').trim() ||
+    getMessageTextContent(message, 'reasoning').trim() ||
+    getMessageFileBlocks(message).length > 0 ||
+    getVisibleMessageEvents(message).length > 0
   );
 }
 
@@ -1230,7 +1215,6 @@ export function renderChatMessageBubbleContent(
   const sourceItems = collectSourceItems(allEvents);
   const inlineExtraction = extractMarkdownInlineFiles(text, message.id);
   const files = [...getMessageFileBlocks(message), ...inlineExtraction.files];
-  const hasMainText = Boolean(text.trim());
   const children: VNodeChild[] = [];
 
   if (reasoningText.trim()) {
@@ -1246,7 +1230,6 @@ export function renderChatMessageBubbleContent(
   }
 
   const eventsNode = renderMessageEvents(
-    message,
     visibleEvents,
     MarkdownContent,
     options.isDark,
@@ -1281,13 +1264,7 @@ export function renderChatMessageBubbleContent(
   }
 
   if (children.length === 0 && message.streaming) {
-    return h('div', { class: 'min-w-0 max-w-full' }, [
-      renderAssistantPending(),
-    ]);
-  }
-
-  if (message.streaming && !hasMainText) {
-    children.push(renderAssistantPending());
+    return null;
   }
 
   return h('div', { class: 'min-w-0 max-w-full space-y-3' }, children);
@@ -1437,16 +1414,17 @@ export function createChatBubbleListRole(
       const message = getBubbleListMessage(item);
       if (!message) {
         return {
-          class: 'mb-3.5',
           placement: 'start',
+          shape: 'default',
+          variant: 'outlined',
         };
       }
 
       return {
         avatar: renderMessageAvatar(message),
-        class: 'mb-3.5',
         classes: getErrorBubbleClasses(message),
         editable: false,
+        loading: isAssistantMessageLoading(message),
         footer: renderMessageFooter(message, options),
         footerPlacement: 'outer-start',
         header: renderMessageHeader(
@@ -1455,23 +1433,24 @@ export function createChatBubbleListRole(
           options.selectedModelLabel,
         ),
         placement: 'start',
+        shape: 'default',
+        streaming: Boolean(message.streaming),
+        variant: 'outlined',
       };
     },
-    divider: {
-      class: 'mb-3.5 w-full',
-    },
+    divider: {},
     user: (item) => {
       const message = getBubbleListMessage(item);
       if (!message) {
         return {
-          class: 'mb-3.5',
           placement: 'end',
+          shape: 'default',
+          variant: 'outlined',
         };
       }
 
       return {
         avatar: renderMessageAvatar(message),
-        class: 'mb-3.5',
         classes: getErrorBubbleClasses(message),
         editable: options.isEditingMessage(message)
           ? {
@@ -1490,6 +1469,8 @@ export function createChatBubbleListRole(
             ? options.onResendEditedMessage(String(value))
             : options.onSaveEditedMessage(String(value)),
         placement: 'end',
+        shape: 'default',
+        variant: 'outlined',
       };
     },
   };

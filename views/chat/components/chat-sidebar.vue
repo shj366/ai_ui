@@ -42,9 +42,14 @@ useInfiniteScroll(
         <Conversations
           :active-key="activeKey"
           :creation="creation"
+          :groupable="true"
           :items="items"
           :menu="menu"
           :on-active-change="onActiveChange"
+          :classes="{
+            group:
+              'text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80',
+          }"
         />
         <div v-if="loadingMore" class="flex justify-center py-3">
           <a-spin />

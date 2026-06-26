@@ -1,17 +1,7 @@
 <script setup lang="ts">
-import type {
-  BubbleListProps,
-  ConversationsProps,
-  SenderProps,
-  SuggestionItem,
-} from '@antdv-next/x';
+import type { BubbleListProps, ConversationsProps } from '@antdv-next/x';
 
-import type {
-  AIMcpResult,
-  AIModelResult,
-  AIProviderResult,
-  AIQuickPhraseResult,
-} from '../../api';
+import type { AIModelResult, AIProviderResult } from '../../api';
 import type {
   AIChatComposerParams,
   AIChatConversationResult,
@@ -37,17 +27,15 @@ import { ColPage, confirm, useVbenModal } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 import { usePreferences } from '@vben/preferences';
 
-import { BubbleList, Suggestion, Welcome } from '@antdv-next/x';
+import { BubbleList, Welcome } from '@antdv-next/x';
 import { message } from 'antdv-next';
 
 import { useVbenForm } from '#/adapter/form';
 
 import {
   getAIAssistantDefaultModelOptionalApi,
-  getAllAIMcpApi,
   getAllAIModelApi,
   getAllAIProviderApi,
-  getAllAIQuickPhraseApi,
 } from '../../api';
 import {
   buildChatCompletionRequest,
@@ -94,26 +82,19 @@ const regeneratingMessageIndex = ref<number>();
 
 const providers = ref<AIProviderResult[]>([]);
 const models = ref<AIModelResult[]>([]);
-const mcps = ref<AIMcpResult[]>([]);
-const quickPhrases = ref<AIQuickPhraseResult[]>([]);
 
 const resourcesLoading = ref(false);
 
 const {
   autoFollowMessageScroll,
   handleMessageContainerScroll,
-  messageContainerRef,
   resumeAutoFollowMessageScroll,
   scrollToBottom,
   scrollToBottomIfFollowing,
   scrollToTop,
+  setMessageContainerRef,
   showScrollToBottom,
-} = useChatScroll();
-
-function setMessageContainerRef(element: unknown) {
-  messageContainerRef.value =
-    element instanceof HTMLElement ? element : undefined;
-}
+} = useChatScroll({ reverse: true });
 
 const {
   abort: abortTransientRequest,
@@ -267,10 +248,6 @@ async function applyAssistantDefaultModel(options: { force?: boolean } = {}) {
   selectedModelId.value = defaultModel.model_id;
 }
 
-async function fetchMcps() {
-  mcps.value = await getAllAIMcpApi();
-}
-
 async function fetchModelsByProvider(providerId?: number) {
   const fetchId = ++currentModelFetchId;
 
@@ -295,16 +272,10 @@ async function fetchModelsByProvider(providerId?: number) {
   }
 }
 
-async function fetchQuickPhrases() {
-  quickPhrases.value = await getAllAIQuickPhraseApi();
-}
-
 async function refreshChatResources() {
   await Promise.all([
     fetchProviders(),
     fetchModelsByProvider(selectedProviderId.value),
-    fetchMcps(),
-    fetchQuickPhrases(),
   ]);
 }
 
@@ -977,21 +948,6 @@ const canCreateNewConversation = computed(() => {
   return activeMessages.value.length > 0;
 });
 
-const composerHint = computed(() => {
-  if (editingMessage.value?.message_index !== undefined) {
-    return `正在编辑第 ${editingMessage.value.message_index + 1} 条用户消息`;
-  }
-  if (regeneratingMessageIndex.value !== undefined) {
-    return `正在重新生成第 ${regeneratingMessageIndex.value + 1} 条 AI 回复`;
-  }
-  return '';
-});
-
-const senderAutoSize: NonNullable<SenderProps['autoSize']> = {
-  maxRows: 6,
-  minRows: 2,
-};
-
 const conversationItems = computed<ConversationsProps['items']>(() =>
   buildConversationSidebarItems(conversationSummaries.value),
 );
@@ -1018,40 +974,12 @@ function handleConversationActiveChange(value: number | string) {
   void selectConversation(String(value));
 }
 
-const suggestionItems = computed<SuggestionItem[]>(() => {
-  return quickPhrases.value.map((item) => ({
-    key: String(item.id),
-    label: item.title,
-    value: item.content,
-  }));
-});
-
-function handleSuggestionSelect(value: string) {
-  prompt.value = value;
-}
-
 function handleSenderSubmit(messageText: string) {
   void submitChat(undefined, true, messageText);
 }
 
 function handleSenderChange(value: string) {
   prompt.value = value;
-}
-
-function handleSenderChangeWithSuggestion(
-  value: string,
-  onTrigger: (info?: false | string) => void,
-) {
-  handleSenderChange(value);
-
-  if (value === '/') {
-    onTrigger('/');
-    return;
-  }
-
-  if (!value) {
-    onTrigger(false);
-  }
 }
 
 function confirmDeleteMessage(item: ChatMessageItem) {
@@ -1082,34 +1010,37 @@ const bubbleListRole = computed<BubbleListProps['role']>(() =>
   }),
 );
 
-const { fetchQuickPhrases: fetchQuickPhrasesFromToolbar, renderSenderFooter } =
-  useSenderToolbar({
-    activeConversationId: computed(() => activeConversationId.value),
-    canClearMessages,
-    canCreateNewConversation,
-    composerHint,
-    confirmClearConversationContext,
-    confirmClearMessages,
-    createNewConversation,
-    enableBuiltinTools,
-    generationType,
-    generationTypeButtonLabel,
-    GENERATION_TYPE_OPTIONS,
-    hasAdvancedSettings,
-    mcps,
-    onOpenSettings: () => settingsModalApi.open(),
-    prompt,
-    selectedMcpIds,
-    selectedModelId,
-    selectedProviderId,
-    sending,
-    thinking,
-    thinkingButtonLabel,
-    THINKING_OPTIONS,
-    webSearch,
-    webSearchButtonLabel,
-    WEB_SEARCH_OPTIONS,
-  });
+const {
+  fetchMcps: fetchMcpsFromToolbar,
+  fetchQuickPhrases: fetchQuickPhrasesFromToolbar,
+  renderSenderFooter,
+} = useSenderToolbar({
+  activeConversationId: computed(() => activeConversationId.value),
+  canClearMessages,
+  canCreateNewConversation,
+  confirmClearConversationContext,
+  confirmClearMessages,
+  createNewConversation,
+  enableBuiltinTools,
+  generationType,
+  generationTypeButtonLabel,
+  GENERATION_TYPE_OPTIONS,
+  hasAdvancedSettings,
+  onOpenSettings: () => settingsModalApi.open(),
+  onSelectQuickPhrase: (item) => {
+    prompt.value = prompt.value.trim()
+      ? `${prompt.value.trim()}\n${item.content}`
+      : item.content;
+  },
+  selectedMcpIds,
+  sending,
+  thinking,
+  thinkingButtonLabel,
+  THINKING_OPTIONS,
+  webSearch,
+  webSearchButtonLabel,
+  WEB_SEARCH_OPTIONS,
+});
 
 watch(
   selectedProviderId,
@@ -1122,6 +1053,7 @@ watch(
 const [SettingsModal, settingsModalApi] = useVbenModal({
   class:
     'h-[min(78vh,760px)] w-[min(960px,92vw)] [overscroll-behavior:contain]',
+  contentClass: 'flex h-0 min-h-0 overflow-hidden',
   footer: true,
   onOpenChange(isOpen) {
     document.documentElement.style.overflow = isOpen ? 'hidden' : '';
@@ -1167,7 +1099,7 @@ const [RenameConversationModal, renameConversationModalApi] = useVbenModal({
 onMounted(async () => {
   await fetchProviders();
   await applyAssistantDefaultModel({ force: true });
-  await fetchMcps();
+  await fetchMcpsFromToolbar();
   await fetchQuickPhrasesFromToolbar();
   await initializeSession();
 
@@ -1180,6 +1112,8 @@ onActivated(async () => {
   }
 
   await refreshChatResources();
+  await fetchMcpsFromToolbar();
+  await fetchQuickPhrasesFromToolbar();
   await initializeSession();
   await applyAssistantDefaultModel({ force: true });
 });
@@ -1207,10 +1141,15 @@ onBeforeUnmount(() => {
       />
     </template>
 
-    <section
-      class="flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius)] border border-border bg-card"
+    <a-card
+      :classes="{
+        root: 'flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius)] bg-card',
+        header: 'shrink-0 !border-b !border-border md:!px-6',
+        body: 'flex min-h-0 flex-1 flex-col !p-0',
+      }"
+      variant="outlined"
     >
-      <div class="border-b border-border px-5 py-4 md:px-6">
+      <template #title>
         <div class="flex flex-wrap items-start gap-3">
           <div class="min-w-0 flex-1">
             <div class="flex min-w-0 items-center justify-between gap-4">
@@ -1282,14 +1221,10 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </div>
-      </div>
+      </template>
 
       <div class="relative min-h-0 flex-1">
-        <div
-          :ref="setMessageContainerRef"
-          class="h-full overflow-x-hidden overflow-y-auto px-5 py-5 scroll-smooth md:px-6 md:py-6"
-          @scroll="handleMessageContainerScroll"
-        >
+        <div class="h-full overflow-hidden">
           <div
             v-if="detailLoading"
             class="flex min-h-full items-center justify-center"
@@ -1304,18 +1239,40 @@ onBeforeUnmount(() => {
               <Welcome
                 :description="
                   selectedProviderId && selectedModelId
-                    ? `当前模型：${selectedProviderModelLabel}`
-                    : '选择供应商和模型后开始对话'
+                    ? '可以直接提问、生成内容，或结合工具完成更复杂的任务'
+                    : '先选择供应商和模型，然后开始你的第一个问题'
                 "
-                title="你好，我是 FBA UI 智能助手"
-              />
+                title="你好，我是 FBA AI"
+                :variant="
+                  selectedProviderId && selectedModelId
+                    ? 'filled'
+                    : 'borderless'
+                "
+              >
+                <template #icon>
+                  <div
+                    class="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary"
+                  >
+                    <IconifyIcon
+                      class="size-7"
+                      icon="mdi:robot-happy-outline"
+                    />
+                  </div>
+                </template>
+              </Welcome>
             </div>
           </div>
           <BubbleList
             v-else
+            :ref="setMessageContainerRef"
+            auto-scroll
+            :classes="{
+              scroll: 'scroll-smooth md:px-4 md:pt-4',
+            }"
             :items="bubbleListItems"
+            :on-scroll="handleMessageContainerScroll"
             :role="bubbleListRole"
-            class="min-h-full"
+            class="h-full min-h-0 max-h-full"
           />
         </div>
 
@@ -1330,32 +1287,19 @@ onBeforeUnmount(() => {
         </button>
       </div>
 
-      <Suggestion
-        block
-        :items="suggestionItems"
-        @select="handleSuggestionSelect"
-      >
-        <template #default="{ onKeyDown, onTrigger }">
-          <ChatSender
-            :auto-size="senderAutoSize"
-            :disabled="false"
-            :footer="renderSenderFooter"
-            :loading="sending"
-            name="chat-message"
-            :on-cancel="stopStreaming"
-            :on-change="
-              (value: string) =>
-                handleSenderChangeWithSuggestion(String(value), onTrigger)
-            "
-            :on-key-down="onKeyDown"
-            :on-submit="handleSenderSubmit"
-            placeholder="在这里输入消息，按 Enter 发送"
-            :suffix="false"
-            :value="prompt"
-          />
-        </template>
-      </Suggestion>
-    </section>
+      <ChatSender
+        :disabled="false"
+        :footer="renderSenderFooter"
+        :loading="sending"
+        name="chat-message"
+        :on-cancel="stopStreaming"
+        :on-change="handleSenderChange"
+        :on-submit="handleSenderSubmit"
+        placeholder="在这里输入消息，Enter 发送，Shift + Enter 换行"
+        :suffix="false"
+        :value="prompt"
+      />
+    </a-card>
 
     <SettingsModal :show-cancel-button="false" :show-confirm-button="false">
       <template #title>

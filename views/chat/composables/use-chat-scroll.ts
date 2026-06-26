@@ -1,9 +1,23 @@
+import type { BubbleListRef } from '@antdv-next/x';
+
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 
 const BOTTOM_THRESHOLD = 96;
 const PROGRAMMATIC_SCROLL_LOCK_MS = 160;
 
-export function useChatScroll() {
+interface UseChatScrollOptions {
+  reverse?: boolean;
+}
+
+function getBubbleListScrollElement(element: unknown) {
+  if (!element || typeof element !== 'object') {
+    return undefined;
+  }
+
+  return (element as Partial<BubbleListRef>).scrollBoxNativeElement;
+}
+
+export function useChatScroll(options: UseChatScrollOptions = {}) {
   const messageContainerRef = ref<HTMLElement>();
   const autoFollowMessageScroll = ref(true);
   const hasScrollableMessages = ref(false);
@@ -15,6 +29,23 @@ export function useChatScroll() {
   let contentMutationObserver: MutationObserver | undefined;
   let scheduledScrollFrame: number | undefined;
   let programmaticScrollUntil = 0;
+
+  function getBottomDistance(container: HTMLElement) {
+    if (options.reverse) {
+      return Math.abs(container.scrollTop);
+    }
+
+    return (
+      container.scrollHeight - container.scrollTop - container.clientHeight
+    );
+  }
+
+  function setMessageContainerRef(element: unknown) {
+    messageContainerRef.value =
+      element instanceof HTMLElement
+        ? element
+        : getBubbleListScrollElement(element);
+  }
 
   function updateScrollableState() {
     const container = messageContainerRef.value;
@@ -29,10 +60,7 @@ export function useChatScroll() {
       return true;
     }
 
-    return (
-      container.scrollHeight - container.scrollTop - container.clientHeight <=
-      threshold
-    );
+    return getBottomDistance(container) <= threshold;
   }
 
   function syncAutoFollowMessageScroll() {
@@ -62,7 +90,7 @@ export function useChatScroll() {
 
   function setScrollTopToBottom(container: HTMLElement) {
     programmaticScrollUntil = performance.now() + PROGRAMMATIC_SCROLL_LOCK_MS;
-    container.scrollTop = container.scrollHeight;
+    container.scrollTop = options.reverse ? 0 : container.scrollHeight;
     updateScrollableState();
   }
 
@@ -113,7 +141,9 @@ export function useChatScroll() {
       }
 
       programmaticScrollUntil = performance.now() + PROGRAMMATIC_SCROLL_LOCK_MS;
-      container.scrollTo({ top: 0 });
+      container.scrollTo({
+        top: options.reverse ? -container.scrollHeight : 0,
+      });
       updateScrollableState();
       autoFollowMessageScroll.value = false;
     });
@@ -139,6 +169,9 @@ export function useChatScroll() {
     const observeResizeTargets = () => {
       contentResizeObserver?.disconnect();
       contentResizeObserver?.observe(container);
+      if (container.firstElementChild) {
+        contentResizeObserver?.observe(container.firstElementChild);
+      }
       for (const child of [...container.children]) {
         contentResizeObserver?.observe(child);
       }
@@ -153,8 +186,9 @@ export function useChatScroll() {
       }
     });
     contentMutationObserver.observe(container, {
+      characterData: true,
       childList: true,
-      subtree: false,
+      subtree: true,
     });
   }
 
@@ -182,6 +216,7 @@ export function useChatScroll() {
     scrollToBottom,
     scrollToBottomIfFollowing,
     scrollToTop,
+    setMessageContainerRef,
     showScrollToBottom,
   };
 }

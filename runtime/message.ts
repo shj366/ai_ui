@@ -291,6 +291,14 @@ function hasReasoningBlocks(message: Pick<AIChatMessage, 'blocks'>) {
   return getBlocksByType(message, 'reasoning').length > 0;
 }
 
+function hasTextBlocks(message: Pick<AIChatMessage, 'blocks'>) {
+  return Boolean(getMessageTextContent(message, 'text').trim());
+}
+
+function hasStandaloneErrorContent(message: ChatMessageItem) {
+  return message.message_type === 'error' && hasTextBlocks(message);
+}
+
 function shouldMergeAssistantMessages(
   current: ChatMessageItem | undefined,
   incoming: ChatMessageItem,
@@ -303,7 +311,10 @@ function shouldMergeAssistantMessages(
     return false;
   }
 
-  if (current.message_type === 'error' || incoming.message_type === 'error') {
+  if (
+    hasStandaloneErrorContent(current) ||
+    hasStandaloneErrorContent(incoming)
+  ) {
     return false;
   }
 
@@ -344,6 +355,11 @@ function mergeChatMessageItems(
   current: ChatMessageItem,
   incoming: ChatMessageItem,
 ): ChatMessageItem {
+  const messageType =
+    current.message_type === 'error' && incoming.message_type === 'error'
+      ? 'error'
+      : 'normal';
+
   return {
     ...incoming,
     blocks: mergeMessageBlocks(current.blocks ?? [], incoming.blocks ?? []),
@@ -353,7 +369,7 @@ function mergeChatMessageItems(
     id: incoming.id || current.id,
     message_id: incoming.message_id ?? current.message_id ?? null,
     message_index: incoming.message_index ?? current.message_index,
-    message_type: incoming.message_type ?? current.message_type ?? 'normal',
+    message_type: messageType,
     model_id: incoming.model_id ?? current.model_id ?? null,
     provider_id: incoming.provider_id ?? current.provider_id ?? null,
     role: incoming.role,
@@ -378,9 +394,54 @@ export function mergeAdjacentAssistantMessages(messages: ChatMessageItem[]) {
   return merged;
 }
 
+export function mergeAdjacentAssistantMessagesInOrder(
+  messages: ChatMessageItem[],
+) {
+  const merged: ChatMessageItem[] = [];
+
+  for (const message of messages) {
+    const current = merged.at(-1);
+
+    if (!current || !shouldMergeAssistantMessages(current, message)) {
+      merged.push(message);
+      continue;
+    }
+
+    const messageType =
+      current.message_type === 'error' && message.message_type === 'error'
+        ? 'error'
+        : 'normal';
+
+    merged[merged.length - 1] = {
+      ...message,
+      blocks: [
+        ...(current.blocks ?? []).map((block) =>
+          normalizeAIChatMessageBlock(block),
+        ),
+        ...(message.blocks ?? []).map((block) =>
+          normalizeAIChatMessageBlock(block),
+        ),
+      ],
+      conversation_id:
+        message.conversation_id ?? current.conversation_id ?? null,
+      created_time: current.created_time || message.created_time,
+      id: current.id || message.id,
+      message_id: current.message_id ?? message.message_id ?? null,
+      message_index: current.message_index ?? message.message_index,
+      message_type: messageType,
+      model_id: message.model_id ?? current.model_id ?? null,
+      provider_id: message.provider_id ?? current.provider_id ?? null,
+      role: message.role,
+      streaming: Boolean(current.streaming || message.streaming),
+    };
+  }
+
+  return merged;
+}
+
 function getBlockMergeKey(block: AIChatMessageBlock) {
   if (block.type === 'event') {
-    return `event:${block.event_key}`;
+    return `event:${block.event_key}:${block.event_type}`;
   }
 
   if (block.type === 'file') {

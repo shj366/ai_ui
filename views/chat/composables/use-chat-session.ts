@@ -18,7 +18,7 @@ import {
   pinAIChatConversationApi,
 } from '../../../api/chat';
 import {
-  mergeAdjacentAssistantMessages,
+  mergeAdjacentAssistantMessagesInOrder,
   normalizeMessage,
 } from '../../../runtime/message';
 
@@ -176,7 +176,7 @@ export function useChatSession(options: UseChatSessionOptions) {
 
       syncConversationSummaryFromDetail(detail);
       activeConversationDetail.value = detail;
-      activeMessages.value = mergeAdjacentAssistantMessages(
+      activeMessages.value = mergeAdjacentAssistantMessagesInOrder(
         detail.messages.map((item, index) =>
           normalizeMessage(item, index, conversationId),
         ),
