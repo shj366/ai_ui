@@ -5,8 +5,17 @@
   "type": "module",
   "dependencies": {
     "@ag-ui/core": "^0.0.53",
-    "@antdv-next/x": "^1.1.1",
-    "@antdv-next/x-markdown": "^0.1.0",
-    "@antdv-next/x-sdk": "^0.0.2"
+    "@lucide/vue": "catalog:",
+    "@radix-icons/vue": "^1.0.0",
+    "@vben-core/shared": "workspace:*",
+    "@vueuse/core": "catalog:",
+    "ai": "^7.0.2",
+    "class-variance-authority": "catalog:",
+    "motion-v": "^2.3.0",
+    "nanoid": "^5.1.16",
+    "reka-ui": "catalog:",
+    "shiki": "^4.3.0",
+    "vue-stick-to-bottom": "^1.0.0",
+    "vue-stream-markdown": "1.0.1-beta.1"
   }
 }

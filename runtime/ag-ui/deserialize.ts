@@ -446,9 +446,10 @@ function normalizeAGUIConversationMessage(
           },
           eventKey: `tool-result:${message.toolCallId}`,
           eventType: 'TOOL_CALL_RESULT',
+          status: message.error ? 'error' : 'success',
           summary: message.toolCallId,
           text: message.error ?? (hasExtractedFiles ? '' : message.content),
-          title: '工具结果',
+          title: message.error ? '工具异常' : '工具结果',
         }),
         ...toolResultBlocks,
       ];

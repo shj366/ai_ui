@@ -82,13 +82,13 @@ const THINKING_OPTIONS: Array<{
   {
     desc: '最轻量的思考强度',
     key: 'minimal',
-    label: 'minimal',
+    label: '极简',
     value: 'minimal',
   },
-  { desc: '较低思考强度', key: 'low', label: 'low', value: 'low' },
-  { desc: '平衡型思考强度', key: 'medium', label: 'medium', value: 'medium' },
-  { desc: '较高思考强度', key: 'high', label: 'high', value: 'high' },
-  { desc: '最高思考强度', key: 'xhigh', label: 'xhigh', value: 'xhigh' },
+  { desc: '较低思考强度', key: 'low', label: '低', value: 'low' },
+  { desc: '平衡型思考强度', key: 'medium', label: '中', value: 'medium' },
+  { desc: '较高思考强度', key: 'high', label: '高', value: 'high' },
+  { desc: '最高思考强度', key: 'xhigh', label: '极高', value: 'xhigh' },
 ];
 
 export interface UseChatSettingsOptions {

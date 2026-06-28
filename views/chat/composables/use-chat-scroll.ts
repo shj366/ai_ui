@@ -1,5 +1,3 @@
-import type { BubbleListRef } from '@antdv-next/x';
-
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 
 const BOTTOM_THRESHOLD = 96;
@@ -9,12 +7,12 @@ interface UseChatScrollOptions {
   reverse?: boolean;
 }
 
-function getBubbleListScrollElement(element: unknown) {
+function getMessageListScrollElement(element: unknown) {
   if (!element || typeof element !== 'object') {
     return undefined;
   }
 
-  return (element as Partial<BubbleListRef>).scrollBoxNativeElement;
+  return (element as { scrollBoxNativeElement?: HTMLElement }).scrollBoxNativeElement;
 }
 
 export function useChatScroll(options: UseChatScrollOptions = {}) {
@@ -44,7 +42,7 @@ export function useChatScroll(options: UseChatScrollOptions = {}) {
     messageContainerRef.value =
       element instanceof HTMLElement
         ? element
-        : getBubbleListScrollElement(element);
+        : getMessageListScrollElement(element);
   }
 
   function updateScrollableState() {
@@ -94,23 +92,38 @@ export function useChatScroll(options: UseChatScrollOptions = {}) {
     updateScrollableState();
   }
 
-  function scheduleScrollToBottom(force = false) {
+  function scheduleScrollToBottom(force = false, remainingAttempts = 2) {
     cancelScheduledScroll();
 
     scheduledScrollFrame = requestAnimationFrame(() => {
       scheduledScrollFrame = undefined;
       const container = messageContainerRef.value;
-      if (!container || (!force && !autoFollowMessageScroll.value)) {
+      if (!container) {
+        if (force && remainingAttempts > 0) {
+          scheduleScrollToBottom(force, remainingAttempts - 1);
+        }
+        return;
+      }
+      if (!force && !autoFollowMessageScroll.value) {
         return;
       }
 
       setScrollTopToBottom(container);
       requestAnimationFrame(() => {
         const nextContainer = messageContainerRef.value;
-        if (!nextContainer || (!force && !autoFollowMessageScroll.value)) {
+        if (!nextContainer) {
+          if (force && remainingAttempts > 0) {
+            scheduleScrollToBottom(force, remainingAttempts - 1);
+          }
+          return;
+        }
+        if (!force && !autoFollowMessageScroll.value) {
           return;
         }
         setScrollTopToBottom(nextContainer);
+        if (force && remainingAttempts > 0) {
+          scheduleScrollToBottom(force, remainingAttempts - 1);
+        }
       });
     });
   }
@@ -201,6 +214,9 @@ export function useChatScroll(options: UseChatScrollOptions = {}) {
 
     observeMessageContent(container);
     syncAutoFollowMessageScroll();
+    if (autoFollowMessageScroll.value) {
+      scheduleScrollToBottom(true, 4);
+    }
   });
 
   onBeforeUnmount(() => {

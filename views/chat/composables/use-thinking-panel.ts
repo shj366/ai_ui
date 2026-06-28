@@ -1,8 +1,8 @@
-import type { ComputedRef, Ref } from 'vue';
+import type { ComputedRef } from 'vue';
 
 import type { ChatMessageItem } from '../../../runtime/message';
 
-import { nextTick, ref, watch } from 'vue';
+import { ref, watch } from 'vue';
 
 import {
   getMessageEventBlocks,
@@ -16,13 +16,11 @@ type ExpandablePanelState = {
 };
 
 export interface UseThinkingPanelOptions {
-  autoFollowMessageScroll: Ref<boolean>;
   displayMessages: ComputedRef<ChatMessageItem[]>;
-  scrollToBottom: () => void;
 }
 
 export function useThinkingPanel(options: UseThinkingPanelOptions) {
-  const { autoFollowMessageScroll, displayMessages, scrollToBottom } = options;
+  const { displayMessages } = options;
 
   const thinkingPanelStates = ref<Record<string, ExpandablePanelState>>({});
   const eventPanelStates = ref<Record<string, ExpandablePanelState>>({});
@@ -31,12 +29,29 @@ export function useThinkingPanel(options: UseThinkingPanelOptions) {
     return message.id;
   }
 
-  function getThinkingPanelKey(message: ChatMessageItem) {
-    return getPanelKey(message);
+  function getThinkingPanelKey(
+    message: ChatMessageItem,
+    panelKey = 'reasoning-0',
+  ) {
+    return `${getPanelKey(message)}:${panelKey}`;
   }
 
   function getEventPanelKey(message: ChatMessageItem) {
     return getPanelKey(message);
+  }
+
+  function getThinkingPanelKeys(message: ChatMessageItem) {
+    return message.blocks
+      .map((block, index) =>
+        block.type === 'reasoning' && block.text.trim()
+          ? getThinkingPanelKey(message, `reasoning-${index}`)
+          : '',
+      )
+      .filter(Boolean);
+  }
+
+  function getEventPanelKeys(message: ChatMessageItem) {
+    return hasEventContent(message) ? [getEventPanelKey(message)] : [];
   }
 
   function getThinkingContent(message: ChatMessageItem) {
@@ -51,9 +66,13 @@ export function useThinkingPanel(options: UseThinkingPanelOptions) {
     return getMessageEventBlocks(message).length > 0;
   }
 
-  function isThinkingExpanded(message: ChatMessageItem) {
+  function isThinkingExpanded(
+    message: ChatMessageItem,
+    panelKey?: string,
+  ) {
     return Boolean(
-      thinkingPanelStates.value[getThinkingPanelKey(message)]?.expanded,
+      thinkingPanelStates.value[getThinkingPanelKey(message, panelKey)]
+        ?.expanded,
     );
   }
 
@@ -61,8 +80,12 @@ export function useThinkingPanel(options: UseThinkingPanelOptions) {
     return Boolean(eventPanelStates.value[getEventPanelKey(message)]?.expanded);
   }
 
-  function setThinkingExpanded(message: ChatMessageItem, expanded: boolean) {
-    const key = getThinkingPanelKey(message);
+  function setThinkingExpanded(
+    message: ChatMessageItem,
+    expanded: boolean,
+    panelKey?: string,
+  ) {
+    const key = getThinkingPanelKey(message, panelKey);
     thinkingPanelStates.value = {
       ...thinkingPanelStates.value,
       [key]: {
@@ -101,8 +124,7 @@ export function useThinkingPanel(options: UseThinkingPanelOptions) {
   }
 
   function resolveNextPanelStates(params: {
-    getKey: (message: ChatMessageItem) => string;
-    hasContent: (message: ChatMessageItem) => boolean;
+    getKeys: (message: ChatMessageItem) => string[];
     messages: ChatMessageItem[];
     previousStates: Record<string, ExpandablePanelState>;
   }) {
@@ -110,46 +132,45 @@ export function useThinkingPanel(options: UseThinkingPanelOptions) {
     let hasChanges = false;
 
     for (const message of params.messages) {
-      if (!params.hasContent(message)) {
-        continue;
-      }
-
-      const key = params.getKey(message);
-      const previous = params.previousStates[key];
+      const keys = params.getKeys(message);
       const hasTextStarted = Boolean(
         getMessageTextContent(message, 'text').trim(),
       );
       const shouldAutoExpand = Boolean(message.streaming && !hasTextStarted);
 
-      if (previous?.manualTouched) {
-        nextStates[key] = previous;
-        continue;
-      }
+      for (const key of keys) {
+        const previous = params.previousStates[key];
 
-      if (shouldAutoExpand) {
-        const nextState = {
-          autoOpened: true,
-          expanded: true,
-          manualTouched: false,
-        };
-        hasChanges ||= hasThinkingPanelStateChanged(previous, nextState);
-        nextStates[key] = nextState;
-        continue;
-      }
+        if (previous?.manualTouched) {
+          nextStates[key] = previous;
+          continue;
+        }
 
-      if (previous?.autoOpened) {
-        const nextState = {
-          autoOpened: false,
-          expanded: false,
-          manualTouched: false,
-        };
-        hasChanges ||= hasThinkingPanelStateChanged(previous, nextState);
-        nextStates[key] = nextState;
-        continue;
-      }
+        if (shouldAutoExpand) {
+          const nextState = {
+            autoOpened: true,
+            expanded: true,
+            manualTouched: false,
+          };
+          hasChanges ||= hasThinkingPanelStateChanged(previous, nextState);
+          nextStates[key] = nextState;
+          continue;
+        }
 
-      if (previous) {
-        nextStates[key] = previous;
+        if (previous?.autoOpened) {
+          const nextState = {
+            autoOpened: false,
+            expanded: false,
+            manualTouched: false,
+          };
+          hasChanges ||= hasThinkingPanelStateChanged(previous, nextState);
+          nextStates[key] = nextState;
+          continue;
+        }
+
+        if (previous) {
+          nextStates[key] = previous;
+        }
       }
     }
 
@@ -165,14 +186,12 @@ export function useThinkingPanel(options: UseThinkingPanelOptions) {
     displayMessages,
     (messages) => {
       const nextThinking = resolveNextPanelStates({
-        getKey: getThinkingPanelKey,
-        hasContent: hasThinkingContent,
+        getKeys: getThinkingPanelKeys,
         messages,
         previousStates: thinkingPanelStates.value,
       });
       const nextEvents = resolveNextPanelStates({
-        getKey: getEventPanelKey,
-        hasContent: hasEventContent,
+        getKeys: getEventPanelKeys,
         messages,
         previousStates: eventPanelStates.value,
       });
@@ -182,12 +201,6 @@ export function useThinkingPanel(options: UseThinkingPanelOptions) {
       }
       if (nextEvents.changed) {
         eventPanelStates.value = nextEvents.states;
-      }
-
-      if (messages.length > 0 && autoFollowMessageScroll.value) {
-        nextTick(() => {
-          scrollToBottom();
-        });
       }
     },
     { immediate: true },
