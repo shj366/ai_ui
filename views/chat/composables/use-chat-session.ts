@@ -33,6 +33,7 @@ interface UseChatSessionOptions {
   notifySuccess: (content: string) => void;
   renameConversationFormData: Ref<AIChatConversationResult | undefined>;
   resetComposerState: (clearPrompt?: boolean) => void;
+  resetMessageListViewport?: () => void;
   scrollToBottom: (force?: boolean) => void;
   scrollToTop: () => void;
   selectedModelId: Ref<string | undefined>;
@@ -235,7 +236,7 @@ export function useChatSession(options: UseChatSessionOptions) {
     const {
       clearTransientMessages = true,
       forceAutoFollow = true,
-      scrollToBottom = true,
+      scrollToBottom = false,
       showLoading = true,
     } = loadOptions;
     const fetchId = ++currentConversationFetchId;
@@ -286,6 +287,9 @@ export function useChatSession(options: UseChatSessionOptions) {
       activeMessages.value.length > 0 &&
       !detailLoading.value
     ) {
+      options.autoFollowMessageScroll.value = true;
+      options.resetMessageListViewport?.();
+      options.scrollToBottom(true);
       return;
     }
 

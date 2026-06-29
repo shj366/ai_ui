@@ -89,6 +89,8 @@ const transientPlacement = ref<{
   insertIndex: number;
   replaceMessageIds: string[];
 }>();
+const messageListViewportVersion = ref(0);
+const messageListScrollKey = ref('draft');
 
 const providers = ref<AIProviderResult[]>([]);
 const models = ref<AIModelResult[]>([]);
@@ -98,11 +100,14 @@ const resourcesLoading = ref(false);
 const {
   autoFollowMessageScroll,
   handleMessageContainerScroll,
+  isScrollRestored,
   scrollToBottom,
   scrollToBottomIfFollowing,
   scrollToTop,
   setMessageContainerRef,
-} = useChatScroll();
+} = useChatScroll({
+  scrollKey: messageListScrollKey,
+});
 
 const {
   abort: abortTransientRequest,
@@ -125,6 +130,10 @@ function resetComposerState(clearPrompt = false) {
 
 function stopStreaming() {
   abortTransientRequest();
+}
+
+function resetMessageListViewport() {
+  messageListViewportVersion.value += 1;
 }
 
 const renameConversationFormData = ref<AIChatConversationResult>();
@@ -162,6 +171,7 @@ const {
   },
   renameConversationFormData,
   resetComposerState,
+  resetMessageListViewport,
   clearTransientMessages: () => {
     setTransientMessages([]);
   },
@@ -172,6 +182,14 @@ const {
   stopStreaming,
   transientRequestError,
 });
+
+watch(
+  activeConversationId,
+  (conversationId) => {
+    messageListScrollKey.value = conversationId || 'draft';
+  },
+  { immediate: true, flush: 'sync' },
+);
 
 // Chat settings needs refs from useChatSession for its watchers
 const {
@@ -978,6 +996,21 @@ const displayMessages = computed<ChatMessageItem[]>(() => {
   return messages.filter((message) => shouldRenderChatMessage(message));
 });
 
+const messageListRestoring = computed(
+  () => displayMessages.value.length > 0 && !isScrollRestored.value,
+);
+const messageAreaLoading = computed(
+  () => detailLoading.value || messageListRestoring.value,
+);
+const messageListClass = computed(() =>
+  [
+    'h-full min-h-0 max-h-full',
+    messageListRestoring.value ? 'invisible' : '',
+  ]
+    .filter(Boolean)
+    .join(' '),
+);
+
 watch(
   displayMessages,
   () => {
@@ -1360,13 +1393,7 @@ onBeforeUnmount(() => {
       <div class="relative min-h-0 flex-1">
         <div class="h-full overflow-hidden">
           <div
-            v-if="detailLoading"
-            class="flex min-h-full items-center justify-center"
-          >
-            <a-spin />
-          </div>
-          <div
-            v-else-if="displayMessages.length === 0"
+            v-if="!detailLoading && displayMessages.length === 0"
             class="flex min-h-full items-center justify-center"
           >
             <div class="w-full max-w-[720px]">
@@ -1392,18 +1419,24 @@ onBeforeUnmount(() => {
             </div>
           </div>
           <ChatConversationList
-            v-else
+            v-else-if="displayMessages.length > 0"
+            :key="`${activeConversationId || 'draft'}:${messageListViewportVersion}`"
             :ref="setMessageContainerRef"
             auto-scroll
             :classes="{
-              scroll: 'scroll-smooth md:pt-4',
+              scroll: 'md:pt-4',
             }"
-            :initial-scroll-key="activeConversationId || 'draft'"
             :items="messageListItems"
             :on-scroll="handleMessageContainerScroll"
             :role="messageListRole"
-            class="h-full min-h-0 max-h-full"
+            :class="messageListClass"
           />
+          <div
+            v-if="messageAreaLoading"
+            class="absolute inset-0 z-10 flex items-center justify-center bg-card"
+          >
+            <a-spin description="正在渲染消息..." />
+          </div>
         </div>
       </div>
 

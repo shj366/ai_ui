@@ -6,7 +6,7 @@ import type {
 } from './types';
 import type { VNodeChild } from 'vue';
 
-import { computed, h, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, h, ref } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 
@@ -28,7 +28,6 @@ const props = withDefaults(
     autoScroll?: boolean;
     class?: string;
     classes?: ChatMessageListProps['classes'];
-    initialScrollKey?: number | string;
     items?: ChatMessageListItem[];
     onScroll?: ChatMessageListProps['onScroll'];
     role?: ChatMessageListProps['role'];
@@ -39,19 +38,13 @@ const props = withDefaults(
 );
 
 const conversationRef = ref<{
+  scrollToBottom?: (options?: unknown) => Promise<boolean> | boolean;
   scrollBoxNativeElement?: HTMLElement;
 }>();
 const editDrafts = ref<Record<string, string>>({});
-const initialBottomReady = ref(false);
-let handledInitialBottom = false;
-let initialBottomFrame: number | undefined;
 
 const conversationClass = computed(() =>
-  cn(
-    'h-full min-h-0 max-h-full',
-    !initialBottomReady.value && 'invisible',
-    props.class,
-  ),
+  cn('h-full min-h-0 max-h-full', props.class),
 );
 const contentClass = computed(() =>
   cn(
@@ -388,85 +381,21 @@ function renderMessage(item: ChatMessageListItem) {
 
 const renderedItems = computed(() =>
   props.items.map((item) =>
-    item.role === 'divider' ? renderDivider(item) : renderMessage(item),
+    h(
+      'div',
+      {
+        key: getItemKey(item),
+        class: 'min-w-0',
+        'data-chat-message-key': getItemKey(item),
+      },
+      [item.role === 'divider' ? renderDivider(item) : renderMessage(item)],
+    ),
   ),
 );
 
 function handleScroll(event: Event) {
   props.onScroll?.(event);
 }
-
-function cancelInitialBottomFrame() {
-  if (initialBottomFrame === undefined) {
-    return;
-  }
-
-  cancelAnimationFrame(initialBottomFrame);
-  initialBottomFrame = undefined;
-}
-
-function setScrollTopToBottom(element: HTMLElement) {
-  element.scrollTop = element.scrollHeight;
-}
-
-function revealAtInitialBottom(remainingAttempts = 4) {
-  cancelInitialBottomFrame();
-  initialBottomFrame = requestAnimationFrame(() => {
-    initialBottomFrame = undefined;
-    const element = conversationRef.value?.scrollBoxNativeElement;
-
-    if (!element) {
-      if (remainingAttempts > 0) {
-        revealAtInitialBottom(remainingAttempts - 1);
-      } else {
-        initialBottomReady.value = true;
-      }
-      return;
-    }
-
-    setScrollTopToBottom(element);
-    requestAnimationFrame(() => {
-      setScrollTopToBottom(element);
-      initialBottomReady.value = true;
-    });
-  });
-}
-
-function prepareInitialBottom() {
-  if (handledInitialBottom) {
-    return;
-  }
-
-  if (!props.autoScroll || props.items.length === 0) {
-    initialBottomReady.value = true;
-    return;
-  }
-
-  handledInitialBottom = true;
-  initialBottomReady.value = false;
-  nextTick(() => {
-    revealAtInitialBottom();
-  });
-}
-
-watch(
-  () => props.initialScrollKey,
-  () => {
-    cancelInitialBottomFrame();
-    handledInitialBottom = false;
-    prepareInitialBottom();
-  },
-  { immediate: true },
-);
-
-watch(
-  () => props.items.length,
-  () => {
-    prepareInitialBottom();
-  },
-);
-
-onBeforeUnmount(cancelInitialBottomFrame);
 
 defineExpose({
   get scrollBoxNativeElement() {
@@ -484,6 +413,7 @@ defineExpose({
   >
     <ConversationContent :class="contentClass">
       <VNodeRenderer :node="renderedItems" />
+      <div aria-hidden="true" class="h-px w-full" data-chat-bottom-sentinel />
     </ConversationContent>
 
     <template #overlay>
