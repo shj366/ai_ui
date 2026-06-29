@@ -40,6 +40,10 @@ import {
   normalizeAIChatFileBlock,
   parseDateLabel,
 } from '../../../runtime/message';
+import {
+  AIHtmlPageCard,
+  isHtmlPageCommand,
+} from '../renderers/custom/html-page-card';
 import { AIJsonPreview } from '../renderers/custom/json-preview';
 import {
   createAIReplyMarkdownStreaming,
@@ -764,11 +768,43 @@ function renderDataPreview(
     return null;
   }
 
+  if (isHtmlPageCommand(data)) {
+    return h(AIHtmlPageCard as Component, {
+      data,
+    });
+  }
+
   return h(AIJsonPreview as Component, {
     data,
     isDark,
     title,
   });
+}
+
+function parseToolResultData(data: unknown) {
+  if (isHtmlPageCommand(data)) {
+    return data;
+  }
+
+  let content = '';
+  if (typeof data === 'string') {
+    content = data;
+  } else if (
+    typeof (data as { contentPreview?: unknown })?.contentPreview === 'string'
+  ) {
+    content = (data as { contentPreview: string }).contentPreview;
+  }
+
+  if (!content.trim()) {
+    return data;
+  }
+
+  try {
+    const parsed = JSON.parse(content);
+    return isHtmlPageCommand(parsed) ? parsed : data;
+  } catch {
+    return data;
+  }
 }
 
 function formatEventTextPreview(text: string) {
@@ -852,7 +888,7 @@ function renderEventContent(
       Boolean((item.data as { contentPreview?: unknown })?.contentPreview));
   const dataPreview = shouldPreviewEventData
     ? renderDataPreview(
-        item.data,
+        parseToolResultData(item.data),
         item.status === 'error' ? '错误详情' : '工具结果详情',
         isDark,
       )
@@ -1088,25 +1124,24 @@ function renderMessageEvents(
       buildThoughtChainItem(item, getEventDisplayTitle(item), status, content),
     ];
   });
-
-  const expandedKeys = thoughtItems
-    .filter((item) => item.status === 'loading' || item.status === 'error')
-    .map((item) => item.key)
-    .filter((key): key is string => typeof key === 'string');
+  const shouldOpen = events.some(
+    (item) => item.status === 'running' || item.status === 'error',
+  );
 
   return h(
-    'div',
+    'details',
     {
       key: `${message.id}-events`,
       class:
-        'min-w-0 max-w-full rounded-2xl border border-border/70 bg-muted/20 px-3 py-3 shadow-sm dark:bg-muted/10',
+        'group min-w-0 max-w-full rounded-2xl border border-border/70 bg-muted/20 px-3 py-3 shadow-sm dark:bg-muted/10',
+      open: shouldOpen,
     },
     [
       h(
-        'div',
+        'summary',
         {
           class:
-            'mb-2 inline-flex items-center gap-1.5 text-xs font-medium leading-none text-muted-foreground',
+            'flex cursor-pointer select-none items-center gap-1.5 text-xs font-medium leading-none text-muted-foreground marker:hidden',
         },
         [
           h(IconifyIcon, {
@@ -1116,13 +1151,27 @@ function renderMessageEvents(
               : 'mdi:timeline-check-outline',
           }),
           '执行过程',
+          h(
+            'span',
+            {
+              class: 'text-[11px] font-normal text-muted-foreground/80',
+            },
+            `${thoughtItems.length} 步`,
+          ),
+          h(IconifyIcon, {
+            class:
+              'ml-auto size-3.5 transition-transform group-open:rotate-180',
+            icon: 'mdi:chevron-down',
+          }),
         ],
       ),
-      h(ThoughtChain, {
-        defaultExpandedKeys: expandedKeys,
-        items: thoughtItems,
-        line: 'dashed',
-      }),
+      h('div', { class: 'mt-2' }, [
+        h(ThoughtChain, {
+          defaultExpandedKeys: [],
+          items: thoughtItems,
+          line: 'dashed',
+        }),
+      ]),
     ],
   );
 }
