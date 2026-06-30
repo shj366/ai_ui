@@ -1638,14 +1638,8 @@ function getMessageActionItems(
       {
         icon: h(IconifyIcon, { class: 'size-3.5', icon: 'mdi:pencil-outline' }),
         key: 'edit',
-        label: '编辑保存',
+        label: '编辑',
         onItemClick: () => options.onBeginEditMessage(message, 'save'),
-      },
-      {
-        icon: h(IconifyIcon, { class: 'size-3.5', icon: 'mdi:send-outline' }),
-        key: 'edit-resend',
-        label: '编辑重发',
-        onItemClick: () => options.onBeginEditMessage(message, 'resend'),
       },
     );
   }
