@@ -189,10 +189,10 @@ const [Modal, modalApi] = useVbenModal({
         args: type === 0 ? parseArgsInput(data.args) : undefined,
         headers:
           type === 0 ? undefined : parseHeadersInput(data.headers, '请求头'),
-        include_instructions: Boolean(data.include_instructions),
+        include_instructions: data.include_instructions ?? false,
         name: data.name,
-        read_timeout: data.read_timeout,
-        timeout: data.timeout,
+        read_timeout: data.read_timeout ?? 300,
+        timeout: data.timeout ?? 5,
         tool_prefix: data.tool_prefix?.trim() || undefined,
         type,
         url: type === 0 ? undefined : data.url?.trim() || undefined,

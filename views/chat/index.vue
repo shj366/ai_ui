@@ -1,5 +1,9 @@
 <script setup lang="ts">
-import type { AIModelResult, AIProviderResult } from '../../api';
+import type {
+  AIDefaultModelResult,
+  AIModelResult,
+  AIProviderModelOptionResult,
+} from '../../api';
 import type {
   AIChatComposerAttachment,
   AIChatComposerParams,
@@ -37,13 +41,10 @@ import { message } from 'antdv-next';
 import { useVbenForm } from '#/adapter/form';
 import { ConversationEmptyState } from '#/plugins/ai/components/ai-elements';
 
-import {
-  getAIAssistantDefaultModelOptionalApi,
-  getAllAIModelApi,
-  getAllAIProviderApi,
-} from '../../api';
+import { getAIModelOptionsApi } from '../../api';
 import {
   buildChatCompletionRequest,
+  buildChatRegenerateRequest,
   updateAIChatConversationApi,
   updateAIChatMessageApi,
 } from '../../api/chat';
@@ -76,6 +77,7 @@ import { useChatSession } from './composables/use-chat-session';
 import { useChatSettings } from './composables/use-chat-settings';
 import { usePromptToolbar } from './composables/use-prompt-toolbar';
 import { useThinkingPanel } from './composables/use-thinking-panel';
+import { normalizeAIModelOptions } from './model-options';
 
 const { isDark } = usePreferences();
 const prompt = ref('');
@@ -92,7 +94,7 @@ const transientPlacement = ref<{
 const messageListViewportVersion = ref(0);
 const messageListScrollKey = ref('draft');
 
-const providers = ref<AIProviderResult[]>([]);
+const providers = ref<AIProviderModelOptionResult[]>([]);
 const models = ref<AIModelResult[]>([]);
 
 const resourcesLoading = ref(false);
@@ -250,19 +252,15 @@ const renameConversationSchema: VbenFormSchema[] = [
   },
 ];
 
-let currentModelFetchId = 0;
 let hasInitialized = false;
 
-async function fetchProviders() {
-  providers.value = await getAllAIProviderApi();
-}
-
-async function applyAssistantDefaultModel(options: { force?: boolean } = {}) {
-  if (!options.force && selectedProviderId.value && selectedModelId.value) {
+function applyAssistantDefaultModel(
+  defaultModel?: AIDefaultModelResult | null,
+) {
+  if (selectedProviderId.value && selectedModelId.value) {
     return;
   }
 
-  const defaultModel = await getAIAssistantDefaultModelOptionalApi();
   if (!defaultModel || Number(defaultModel.status) !== 1) {
     return;
   }
@@ -271,53 +269,30 @@ async function applyAssistantDefaultModel(options: { force?: boolean } = {}) {
   selectedModelId.value = defaultModel.model_id;
 }
 
-function getEnabledProviderIds(source = providers.value) {
-  return source
-    .filter((item) => Number(item.status) === 1)
-    .map((item) => item.id);
-}
-
-async function fetchModelsByProviders(providerIds = getEnabledProviderIds()) {
-  const fetchId = ++currentModelFetchId;
-
-  if (providerIds.length === 0) {
-    models.value = [];
-    if (!activeConversationId.value) {
-      selectedModelId.value = undefined;
-    }
-    return;
-  }
-
-  const data = (
-    await Promise.all(
-      providerIds.map((providerId) =>
-        getAllAIModelApi({ provider_id: providerId }),
-      ),
-    )
-  ).flat();
-
-  if (fetchId !== currentModelFetchId) {
-    return;
-  }
-
-  models.value = data;
-
-  const selectedModelExists = data.some(
+function selectedModelExists(data: AIModelResult[]) {
+  return data.some(
     (item) =>
       item.provider_id === selectedProviderId.value &&
       item.model_id === selectedModelId.value,
   );
-
-  if (selectedModelId.value && !selectedModelExists) {
-    selectedModelId.value = undefined;
-  }
 }
 
 async function refreshChatResources() {
   resourcesLoading.value = true;
   try {
-    await fetchProviders();
-    await fetchModelsByProviders();
+    const data = normalizeAIModelOptions(await getAIModelOptionsApi());
+
+    providers.value = data.providers;
+    models.value = data.models;
+
+    if (selectedModelId.value && !selectedModelExists(data.models)) {
+      selectedProviderId.value = undefined;
+      selectedModelId.value = undefined;
+    }
+
+    applyAssistantDefaultModel(data.defaultModel);
+  } catch (error) {
+    message.error((error as Error).message);
   } finally {
     resourcesLoading.value = false;
   }
@@ -758,14 +733,6 @@ async function submitChat(
     draftConversationTitle.value = submittedTitle;
   }
   autoFollowMessageScroll.value = true;
-  const completionRequest = buildChatCompletionRequest({
-    attachments: submittedAttachments,
-    conversationId: targetConversationId,
-    params: payload,
-    promptText:
-      regenerateMessageId === undefined ? submittedPromptText : undefined,
-  });
-
   transientRequestError.value = null;
   transientPlacement.value = nextTransientPlacement;
   setTransientMessages([]);
@@ -777,7 +744,12 @@ async function submitChat(
   const requestParams: AIChatProviderRequest =
     regenerateMessageId === undefined
       ? {
-          body: completionRequest,
+          body: buildChatCompletionRequest({
+            attachments: submittedAttachments,
+            conversationId: targetConversationId,
+            params: payload,
+            promptText: submittedPromptText,
+          }),
           localMessages: hasInput
             ? [
                 createProviderUserMessage(
@@ -790,11 +762,10 @@ async function submitChat(
           mode: 'create',
         }
       : {
-          body: {
-            conversationId:
-              completionRequest.conversationId ?? targetConversationId,
-            forwardedProps: completionRequest.forwardedProps,
-          },
+          body: buildChatRegenerateRequest({
+            conversationId: targetConversationId,
+            params: payload,
+          }),
           conversationId: targetConversationId,
           localMessages: [],
           messageId: regenerateMessageId,
@@ -1003,10 +974,7 @@ const messageAreaLoading = computed(
   () => detailLoading.value || messageListRestoring.value,
 );
 const messageListClass = computed(() =>
-  [
-    'h-full min-h-0 max-h-full',
-    messageListRestoring.value ? 'invisible' : '',
-  ]
+  ['h-full min-h-0 max-h-full', messageListRestoring.value ? 'invisible' : '']
     .filter(Boolean)
     .join(' '),
 );
@@ -1316,7 +1284,6 @@ const [RenameConversationModal, renameConversationModalApi] = useVbenModal({
 
 onMounted(async () => {
   await refreshChatResources();
-  await applyAssistantDefaultModel({ force: true });
   await fetchMcpsFromToolbar();
   await fetchQuickPhrasesFromToolbar();
   await initializeSession();
@@ -1335,7 +1302,6 @@ onActivated(async () => {
   if (!activeConversationId.value && activeMessages.value.length === 0) {
     await initializeSession();
   }
-  await applyAssistantDefaultModel({ force: true });
 });
 
 onBeforeUnmount(() => {

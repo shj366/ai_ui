@@ -7,27 +7,26 @@ import type { PaginationResult } from '#/types';
 import { requestClient } from '#/api/request';
 
 import { getAIChatRequestHeaders, resolveAIChatApiUrl } from './chat';
+import { readOptionalDefaultModelResponse } from './response';
 
-interface ResponseSchema<T> {
-  code: number;
-  data?: T;
-  msg?: string;
-}
+export type AIProviderType = 0 | 1 | 2 | 3 | 4 | 5;
+export type AIStatusType = 0 | 1;
+export type AIMcpType = 0 | 1 | 2;
 
 interface AIProviderQueryParams {
   cursor?: null | string;
   name?: null | string;
-  status?: null | number;
-  type?: null | number;
+  status?: AIStatusType | null;
+  type?: AIProviderType | null;
   size?: number;
 }
 
 export interface AIProviderParams {
   name: string;
-  type: number;
+  type: AIProviderType;
   api_key: string;
   api_host: string;
-  status: number;
+  status: AIStatusType;
   remark?: null | string;
 }
 
@@ -45,6 +44,21 @@ export interface AIProviderModelResult {
   created: number;
 }
 
+export type AIDefaultModelOptionalResult = AIDefaultModelResult | null;
+
+export interface AIProviderModelOptionResult {
+  id: number;
+  name: string;
+  type: AIProviderType;
+  status: AIStatusType;
+  models: AIModelResult[];
+}
+
+export interface AIModelOptionsResult {
+  providers: AIProviderModelOptionResult[];
+  default_model?: AIDefaultModelResult | null;
+}
+
 export interface AIProviderListResult {
   items: AIProviderResult[];
   has_more: boolean;
@@ -54,7 +68,7 @@ export interface AIProviderListResult {
 export interface AIModelQueryParams {
   provider_id?: null | number;
   model_id?: null | string;
-  status?: null | number;
+  status?: AIStatusType | null;
   page?: number;
   size?: number;
 }
@@ -66,7 +80,11 @@ export interface AIAllModelQueryParams {
 export interface AIModelParams {
   provider_id: number;
   model_id: string;
-  status: number;
+  status: AIStatusType;
+  context_max_part_chars?: null | number;
+  context_max_messages?: null | number;
+  context_keep_messages?: number;
+  context_max_tokens?: null | number;
   remark?: null | string;
 }
 
@@ -83,14 +101,14 @@ export interface AIModelResult extends AIModelParams {
 export interface AIDefaultModelParams {
   provider_id: number;
   model_id: string;
-  status: number;
+  status: AIStatusType;
 }
 
 export interface AIDefaultModelResult extends AIDefaultModelParams {
   id: number;
   scene: 'assistant';
   provider_name: string;
-  provider_type: number;
+  provider_type: AIProviderType;
   created_time: string;
   updated_time?: null | string;
 }
@@ -114,20 +132,20 @@ export interface AIMcpQueryParams {
   name?: null | string;
   page?: number;
   size?: number;
-  type?: null | number;
+  type?: AIMcpType | null;
 }
 
 export interface AIMcpParams {
   name: string;
-  type?: number;
+  type?: AIMcpType;
   description?: null | string;
   url?: null | string;
   headers?: null | Recordable<unknown>;
   command?: null | string;
   args?: null | string[];
   env?: null | Recordable<unknown>;
-  timeout?: null | number;
-  read_timeout?: null | number;
+  timeout?: number;
+  read_timeout?: number;
   tool_prefix?: null | string;
   include_instructions?: boolean;
 }
@@ -216,6 +234,10 @@ export async function getAllAIModelApi(params: AIAllModelQueryParams) {
   });
 }
 
+export async function getAIModelOptionsApi() {
+  return requestClient.get<AIModelOptionsResult>('/api/v1/model-options');
+}
+
 export async function createAIModelApi(data: AIModelParams) {
   return requestClient.post<AIActionResult>('/api/v1/models', data);
 }
@@ -249,17 +271,7 @@ export async function getAIAssistantDefaultModelOptionalApi() {
     },
   );
 
-  if (!response.ok) {
-    return null;
-  }
-
-  const payload =
-    (await response.json()) as ResponseSchema<AIDefaultModelResult>;
-  if (payload.code !== 200 || !payload.data) {
-    return null;
-  }
-
-  return payload.data;
+  return readOptionalDefaultModelResponse<AIDefaultModelResult>(response);
 }
 
 export async function updateAIAssistantDefaultModelApi(
@@ -342,3 +354,4 @@ export async function deleteAIQuickPhraseApi(pk: number) {
 }
 
 export * from './chat';
+export { readOptionalDefaultModelResponse } from './response';

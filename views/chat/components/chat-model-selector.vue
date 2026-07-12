@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { AIModelResult, AIProviderResult } from '../../../api';
+import type { AIModelResult, AIProviderModelOptionResult } from '../../../api';
 
 import { computed, ref } from 'vue';
 
@@ -23,7 +23,7 @@ const props = defineProps<{
   disabled?: boolean;
   loading?: boolean;
   models: AIModelResult[];
-  providers: AIProviderResult[];
+  providers: AIProviderModelOptionResult[];
   selectedModelId?: string;
   selectedProviderId?: number;
 }>();
@@ -101,9 +101,7 @@ function selectModel(model: AIModelResult) {
     <ModelSelectorContent title="选择 AI 模型">
       <ModelSelectorInput placeholder="搜索供应商或模型" />
       <ModelSelectorList>
-        <ModelSelectorEmpty>
-          暂无可用模型
-        </ModelSelectorEmpty>
+        <ModelSelectorEmpty> 暂无可用模型 </ModelSelectorEmpty>
 
         <template
           v-for="(group, groupIndex) in providerModelGroups"
@@ -150,10 +148,7 @@ function selectModel(model: AIModelResult) {
           暂无启用模型，请先在模型服务中同步或启用模型
         </div>
 
-        <div
-          v-if="loading"
-          class="px-3 py-2 text-xs text-muted-foreground"
-        >
+        <div v-if="loading" class="px-3 py-2 text-xs text-muted-foreground">
           正在加载模型...
         </div>
       </ModelSelectorList>

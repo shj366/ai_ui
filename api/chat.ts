@@ -2,7 +2,6 @@ import type {
   ActivityMessage,
   AssistantMessage,
   DeveloperMessage,
-  InputContent,
   MessagesSnapshotEvent,
   ReasoningMessage,
   SystemMessage,
@@ -25,6 +24,10 @@ import { useAccessStore } from '@vben/stores';
 import { requestClient } from '#/api/request';
 
 import { normalizeAGUIConversationDetail } from '../runtime/ag-ui/deserialize';
+import {
+  buildAIChatCompletionRequest,
+  buildAIChatRegenerateRequest,
+} from './chat-request';
 
 export type AIActionResult = null | string;
 
@@ -64,7 +67,7 @@ export interface AIChatForwardedPropsParams {
 export interface AIChatCompletionParams {
   conversationId?: null | string;
   forwardedProps: AIChatForwardedPropsParams;
-  messages: AIChatProtocolMessagePayload;
+  messages: [AIChatProtocolInputMessage, ...AIChatProtocolInputMessage[]];
 }
 
 export type AIChatProtocolInputMessage =
@@ -278,6 +281,11 @@ export interface BuildChatCompletionRequestInput {
   promptText?: string;
 }
 
+export interface BuildChatRegenerateRequestInput {
+  conversationId: string;
+  params: AIChatComposerParams;
+}
+
 export function inferAIChatAttachmentType(
   name?: null | string,
   mimeType?: null | string,
@@ -306,163 +314,19 @@ export function inferAIChatAttachmentType(
   return 'document';
 }
 
-function parseExtraBody(
-  raw: null | string | undefined,
-): null | Recordable<unknown> | undefined {
-  const text = raw?.trim();
-  if (!text) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(text) as unknown;
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Recordable<unknown>;
-    }
-  } catch {
-    // Keep current page-level validation behavior.
-  }
-
-  return undefined;
-}
-
-function toForwardedProps(
-  params: AIChatComposerParams,
-): AIChatForwardedPropsParams {
-  return {
-    enableBuiltinTools: params.enable_builtin_tools ?? true,
-    extraBody: parseExtraBody(params.extra_body),
-    extraHeaders: params.extra_headers ?? undefined,
-    frequencyPenalty: params.frequency_penalty,
-    generationType: params.generation_type ?? 'text',
-    imageAction: params.image_action,
-    imageAspectRatio: params.image_aspect_ratio,
-    imageBackground: params.image_background,
-    imageInputFidelity: params.image_input_fidelity,
-    imageModel: params.image_model,
-    imageModeration: params.image_moderation,
-    imageOutputCompression: params.image_output_compression,
-    imageOutputFormat: params.image_output_format,
-    imagePartialImages: params.image_partial_images,
-    imageQuality: params.image_quality,
-    imageSize: params.image_size,
-    logitBias: params.logit_bias ?? undefined,
-    maxTokens: params.max_tokens,
-    mcpIds: params.mcp_ids ?? undefined,
-    modelId: params.model_id,
-    parallelToolCalls: params.parallel_tool_calls,
-    presencePenalty: params.presence_penalty,
-    providerId: params.provider_id,
-    seed: params.seed,
-    stopSequences: params.stop_sequences ?? undefined,
-    temperature: params.temperature,
-    thinking: params.thinking,
-    timeout: params.timeout,
-    topP: params.top_p,
-    webSearch: params.web_search,
-  };
-}
-
-function createAttachmentContent(
-  attachment: AIChatComposerAttachment,
-): InputContent | null {
-  const mimeType = attachment.mime_type || 'application/octet-stream';
-  const filename = attachment.name || 'attachment';
-  const attachmentUrl = attachment.url
-    ? resolveAIChatApiUrl(attachment.url)
-    : null;
-  const metadata = {
-    filename,
-    size: attachment.size ?? undefined,
-  };
-  const fileType =
-    attachment.file_type ?? inferAIChatAttachmentType(filename, mimeType);
-
-  if (attachmentUrl) {
-    const source = {
-      mimeType,
-      type: 'url' as const,
-      value: attachmentUrl,
-    };
-
-    if (fileType === 'audio' || fileType === 'document') {
-      return { metadata, source, type: fileType };
-    }
-    if (fileType === 'image' || fileType === 'video') {
-      return { metadata, source, type: fileType };
-    }
-
-    return {
-      filename,
-      mimeType,
-      type: 'binary',
-      url: attachmentUrl,
-    };
-  }
-
-  if (!attachment.data) {
-    return null;
-  }
-
-  const source = {
-    mimeType,
-    type: 'data' as const,
-    value: attachment.data,
-  };
-
-  if (fileType === 'audio' || fileType === 'document') {
-    return { metadata, source, type: fileType };
-  }
-  if (fileType === 'image' || fileType === 'video') {
-    return { metadata, source, type: fileType };
-  }
-
-  return {
-    data: attachment.data,
-    filename,
-    mimeType,
-    type: 'binary',
-  };
-}
-
-function createUserMessageContent(
-  promptText?: string,
-  attachments: AIChatComposerAttachment[] = [],
-) {
-  const text = promptText?.trim();
-  const attachmentContents = attachments
-    .map((attachment) => createAttachmentContent(attachment))
-    .filter((item): item is InputContent => item !== null);
-
-  if (attachmentContents.length === 0) {
-    return text;
-  }
-
-  return [
-    ...(text ? [{ text, type: 'text' as const }] : []),
-    ...attachmentContents,
-  ];
-}
-
 export function buildChatCompletionRequest(
   input: BuildChatCompletionRequestInput,
 ): AIChatCompletionParams {
-  const promptText = input.promptText?.trim();
-  const content = createUserMessageContent(promptText, input.attachments);
+  return buildAIChatCompletionRequest(input, {
+    inferAttachmentType: inferAIChatAttachmentType,
+    resolveUrl: resolveAIChatApiUrl,
+  });
+}
 
-  return {
-    conversationId: input.conversationId ?? undefined,
-    forwardedProps: toForwardedProps(input.params),
-    messages: content
-      ? [
-          {
-            content,
-            id: `user-draft-${Date.now()}`,
-            role: 'user',
-          },
-        ]
-      : [],
-  };
+export function buildChatRegenerateRequest(
+  input: BuildChatRegenerateRequestInput,
+): AIChatRegenerateParams {
+  return buildAIChatRegenerateRequest(input);
 }
 
 const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
@@ -487,19 +351,7 @@ function joinApiUrl(baseUrl: string, url: string) {
   return `${normalizedBaseUrl}/${url.replace(/^\/+/, '')}`;
 }
 
-export function resolveAIChatTransportUrl(request: AIChatTransportRequest) {
-  switch (request.mode) {
-    case 'create': {
-      return '/api/v1/chat/completions';
-    }
-    case 'regenerate-from-message': {
-      return `/api/v1/conversations/${request.conversationId}/messages/${request.messageId}/regenerate`;
-    }
-    case 'regenerate-from-response': {
-      return `/api/v1/conversations/${request.conversationId}/messages/${request.messageId}/responses/regenerate`;
-    }
-  }
-}
+export { resolveAIChatTransportUrl } from './chat-transport';
 
 export function resolveAIChatApiUrl(url: string) {
   return joinApiUrl(apiURL, url);
@@ -518,48 +370,7 @@ export function getAIChatRequestHeaders() {
   };
 }
 
-function formatAIChatValidationDetail(detail: unknown) {
-  if (typeof detail === 'string') {
-    return detail;
-  }
-
-  if (!Array.isArray(detail)) {
-    return '';
-  }
-
-  return detail
-    .map((item) => {
-      if (!item || typeof item !== 'object') {
-        return '';
-      }
-
-      const record = item as Recordable<unknown>;
-      const loc = Array.isArray(record.loc) ? record.loc.join('.') : '';
-      const msg = typeof record.msg === 'string' ? record.msg : '';
-      return [loc, msg].filter(Boolean).join(': ');
-    })
-    .filter(Boolean)
-    .join('\n');
-}
-
-export async function readAIChatErrorMessage(response: Response) {
-  const text = await response.text();
-
-  try {
-    const payload = JSON.parse(text);
-    const validationMessage = formatAIChatValidationDetail(payload?.detail);
-    return (
-      payload?.error ||
-      payload?.msg ||
-      payload?.message ||
-      validationMessage ||
-      text ||
-      `HTTP ${response.status}`
-    );
-  } catch {
-    return text || `HTTP ${response.status}`;
-  }
-}
+export { readAIChatErrorMessage } from './response';
 
 export async function getRecentAIChatConversationsApi(
   params?: AIChatConversationQueryParams,

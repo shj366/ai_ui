@@ -1,4 +1,4 @@
-import type { AIMcpParams, AIMcpResult } from '../../api';
+import type { AIMcpParams, AIMcpResult, AIMcpType } from '../../api';
 
 import type { VbenFormSchema } from '#/adapter/form';
 import type { OnActionClickFn, VxeGridProps } from '#/adapter/vxe-table';
@@ -419,7 +419,7 @@ export function parseMcpImportJson(value: string): AIMcpParams {
       ? item.url.trim()
       : undefined;
 
-  let type: number | undefined;
+  let type: AIMcpType | undefined;
   if (command) {
     type = 0;
   } else if (url) {
@@ -545,10 +545,10 @@ export function parseMcpImportJson(value: string): AIMcpParams {
     include_instructions:
       typeof rawIncludeInstructions === 'boolean'
         ? rawIncludeInstructions
-        : undefined,
+        : false,
     name,
-    read_timeout: typeof readTimeout === 'number' ? readTimeout : undefined,
-    timeout: typeof timeout === 'number' ? timeout : undefined,
+    read_timeout: typeof readTimeout === 'number' ? readTimeout : 300,
+    timeout: typeof timeout === 'number' ? timeout : 5,
     tool_prefix: toolPrefix,
     type,
     url,
