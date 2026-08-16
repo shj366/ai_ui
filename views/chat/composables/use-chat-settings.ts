@@ -20,12 +20,21 @@ type ChatThinkingValue = AIChatComposerParams['thinking'];
 type ChatWebSearchType = NonNullable<AIChatComposerParams['web_search']>;
 interface ChatSessionScopedConfig {
   enableBuiltinTools: boolean;
+  enableCodeExecution: boolean;
+  enableWebFetch: boolean;
+  frequencyPenalty?: number;
   generationType: ChatGenerationType;
+  maxTokens?: number;
   modelId?: string;
   parallelToolCalls: boolean;
+  presencePenalty?: number;
   providerId?: number;
   selectedMcpIds: number[];
+  stopSequences: string;
+  temperature?: number;
   thinking: ChatThinkingValue;
+  timeout?: number;
+  topP?: number;
   webSearch: ChatWebSearchType;
 }
 
@@ -34,9 +43,12 @@ const DEFAULT_CHAT_SESSION_SCOPED_CONFIG: Omit<
   'modelId' | 'providerId'
 > = {
   enableBuiltinTools: true,
+  enableCodeExecution: false,
+  enableWebFetch: false,
   generationType: 'text',
   parallelToolCalls: true,
   selectedMcpIds: [],
+  stopSequences: '',
   thinking: undefined,
   webSearch: 'off',
 };
@@ -128,28 +140,15 @@ export function useChatSettings(options: UseChatSettingsOptions) {
   const parallelToolCalls = ref(true);
   const thinking = ref<ChatThinkingValue>(undefined);
   const enableBuiltinTools = ref(true);
+  const enableCodeExecution = ref(false);
+  const enableWebFetch = ref(false);
   const selectedMcpIds = ref<number[]>([]);
   const webSearch = ref<ChatWebSearchType>('off');
   const stopSequences = ref('');
-  const extraHeaders = ref('');
-  const extraBody = ref('');
   const logitBias = ref('');
   const conversationSessionConfigs = ref<
     Record<string, ChatSessionScopedConfig>
   >({});
-
-  function resetGenerationSettings() {
-    maxTokens.value = undefined;
-    temperature.value = 1;
-    topP.value = undefined;
-    timeout.value = undefined;
-  }
-
-  function resetBehaviorSettings() {
-    seed.value = undefined;
-    presencePenalty.value = undefined;
-    frequencyPenalty.value = undefined;
-  }
 
   function resetImageSettings() {
     imageAction.value = undefined;
@@ -165,35 +164,44 @@ export function useChatSettings(options: UseChatSettingsOptions) {
     imageSize.value = undefined;
   }
 
-  function resetToolingSettings() {
-    parallelToolCalls.value = true;
-    enableBuiltinTools.value = true;
-  }
-
-  function resetPassthroughSettings() {
-    stopSequences.value = '';
-    extraHeaders.value = '';
-    extraBody.value = '';
-    logitBias.value = '';
-  }
-
   function resetModelSettings() {
-    resetGenerationSettings();
-    resetBehaviorSettings();
+    maxTokens.value = undefined;
+    temperature.value = 1;
+    topP.value = undefined;
+    timeout.value = undefined;
+    presencePenalty.value = undefined;
+    frequencyPenalty.value = undefined;
+    parallelToolCalls.value =
+      DEFAULT_CHAT_SESSION_SCOPED_CONFIG.parallelToolCalls;
+    thinking.value = DEFAULT_CHAT_SESSION_SCOPED_CONFIG.thinking;
+    enableCodeExecution.value =
+      DEFAULT_CHAT_SESSION_SCOPED_CONFIG.enableCodeExecution;
+    enableWebFetch.value = DEFAULT_CHAT_SESSION_SCOPED_CONFIG.enableWebFetch;
+    stopSequences.value = DEFAULT_CHAT_SESSION_SCOPED_CONFIG.stopSequences;
+    seed.value = undefined;
+    logitBias.value = '';
+    enableBuiltinTools.value = true;
     resetImageSettings();
-    resetToolingSettings();
-    resetPassthroughSettings();
   }
 
   function buildCurrentChatSessionScopedConfig(): ChatSessionScopedConfig {
     return {
       enableBuiltinTools: enableBuiltinTools.value,
+      enableCodeExecution: enableCodeExecution.value,
+      enableWebFetch: enableWebFetch.value,
+      frequencyPenalty: frequencyPenalty.value,
       generationType: generationType.value,
+      maxTokens: maxTokens.value,
       modelId: selectedModelId.value,
       parallelToolCalls: parallelToolCalls.value,
+      presencePenalty: presencePenalty.value,
       providerId: selectedProviderId.value,
       selectedMcpIds: [...selectedMcpIds.value],
+      stopSequences: stopSequences.value,
+      temperature: temperature.value,
       thinking: thinking.value,
+      timeout: timeout.value,
+      topP: topP.value,
       webSearch: webSearch.value,
     };
   }
@@ -218,9 +226,22 @@ export function useChatSettings(options: UseChatSettingsOptions) {
     enableBuiltinTools.value =
       config.enableBuiltinTools ??
       DEFAULT_CHAT_SESSION_SCOPED_CONFIG.enableBuiltinTools;
+    enableCodeExecution.value =
+      config.enableCodeExecution ??
+      DEFAULT_CHAT_SESSION_SCOPED_CONFIG.enableCodeExecution;
+    enableWebFetch.value =
+      config.enableWebFetch ??
+      DEFAULT_CHAT_SESSION_SCOPED_CONFIG.enableWebFetch;
     selectedMcpIds.value = [...(config.selectedMcpIds ?? [])];
     webSearch.value =
       config.webSearch ?? DEFAULT_CHAT_SESSION_SCOPED_CONFIG.webSearch;
+    maxTokens.value = config.maxTokens;
+    temperature.value = config.temperature ?? 1;
+    topP.value = config.topP;
+    timeout.value = config.timeout;
+    presencePenalty.value = config.presencePenalty;
+    frequencyPenalty.value = config.frequencyPenalty;
+    stopSequences.value = config.stopSequences ?? '';
   }
 
   function rememberConversationSessionConfig(conversationId?: null | string) {
@@ -269,17 +290,19 @@ export function useChatSettings(options: UseChatSettingsOptions) {
 
   function hasToolingSettingsChanged() {
     return Boolean(
-      parallelToolCalls.value !== true || enableBuiltinTools.value !== true,
+      parallelToolCalls.value !==
+        DEFAULT_CHAT_SESSION_SCOPED_CONFIG.parallelToolCalls ||
+      enableBuiltinTools.value !==
+        DEFAULT_CHAT_SESSION_SCOPED_CONFIG.enableBuiltinTools ||
+      enableCodeExecution.value !==
+        DEFAULT_CHAT_SESSION_SCOPED_CONFIG.enableCodeExecution ||
+      enableWebFetch.value !==
+        DEFAULT_CHAT_SESSION_SCOPED_CONFIG.enableWebFetch,
     );
   }
 
   function hasPassthroughSettingsChanged() {
-    return Boolean(
-      stopSequences.value.trim() ||
-      extraHeaders.value.trim() ||
-      extraBody.value.trim() ||
-      logitBias.value.trim(),
-    );
+    return Boolean(stopSequences.value.trim() || logitBias.value.trim());
   }
 
   const hasAdvancedSettings = computed(() => {
@@ -356,8 +379,8 @@ export function useChatSettings(options: UseChatSettingsOptions) {
     WEB_SEARCH_OPTIONS,
     conversationSessionConfigs,
     enableBuiltinTools,
-    extraBody,
-    extraHeaders,
+    enableCodeExecution,
+    enableWebFetch,
     frequencyPenalty,
     generationType,
     generationTypeButtonLabel,

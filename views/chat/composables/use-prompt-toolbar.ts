@@ -36,10 +36,8 @@ type PromptInputFooterComponents =
   };
 
 export interface UsePromptToolbarOptions {
-  activeConversationId: Ref<string>;
   canClearMessages: Ref<boolean>;
   canCreateNewConversation: Ref<boolean>;
-  confirmClearConversationContext: () => void;
   confirmClearMessages: () => void;
   createNewConversation: () => void;
   enableBuiltinTools: Ref<boolean>;
@@ -78,10 +76,8 @@ export function usePromptToolbar(options: UsePromptToolbarOptions) {
   const optionCardRadiusClass = '!rounded-[var(--radius)]';
 
   const {
-    activeConversationId,
     canClearMessages,
     canCreateNewConversation,
-    confirmClearConversationContext,
     confirmClearMessages,
     createNewConversation,
     generationType,
@@ -488,7 +484,7 @@ export function usePromptToolbar(options: UsePromptToolbarOptions) {
         renderAdvancedMenuItem({
           disabled: sending.value || !canCreateNewConversation.value,
           icon: 'mdi:message-plus-outline',
-          label: '新建话题',
+          label: '新建对话',
           onClick: createNewConversation,
         }),
         h(
@@ -595,14 +591,6 @@ export function usePromptToolbar(options: UsePromptToolbarOptions) {
             confirmClearMessages();
           },
         }),
-        renderAdvancedMenuItem({
-          disabled: sending.value || !activeConversationId.value,
-          icon: 'mdi:broom',
-          label: '清除上下文',
-          onClick: () => {
-            confirmClearConversationContext();
-          },
-        }),
       ],
     );
   }
@@ -631,9 +619,9 @@ export function usePromptToolbar(options: UsePromptToolbarOptions) {
             renderFooterIconButton({
               disabled: sending.value || !canCreateNewConversation.value,
               icon: 'mdi:message-plus-outline',
-              label: '新话题',
+              label: '新对话',
               onClick: createNewConversation,
-              title: '新建话题',
+              title: '新建对话',
             }),
             AttachmentButton ? h(AttachmentButton) : null,
             h(
@@ -748,15 +736,6 @@ export function usePromptToolbar(options: UsePromptToolbarOptions) {
                 confirmClearMessages();
               },
               title: '清空消息',
-            }),
-            renderFooterIconButton({
-              class: 'hidden sm:!inline-flex',
-              disabled: sending.value || !activeConversationId.value,
-              icon: 'mdi:broom',
-              onClick: () => {
-                confirmClearConversationContext();
-              },
-              title: '清除上下文',
             }),
             h(
               aPopover,
