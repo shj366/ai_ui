@@ -4,7 +4,10 @@ import {
   buildAIChatCompletionRequest,
   buildAIChatRegenerateRequest,
 } from './chat-request';
-import { resolveAIChatTransportUrl } from './chat-transport';
+import {
+  resolveAIChatResumeStreamUrl,
+  resolveAIChatTransportUrl,
+} from './chat-transport';
 
 const buildChatCompletionRequest = (
   input: Parameters<typeof buildAIChatCompletionRequest>[0],
@@ -16,7 +19,8 @@ const buildChatCompletionRequest = (
 
 const composerParams = {
   enable_builtin_tools: true,
-  extra_body: '{"reasoning_effort":"high"}',
+  enable_code_execution: true,
+  enable_web_fetch: false,
   mcp_ids: [1, 2],
   mode: 'create' as const,
   model_id: 'gpt-test',
@@ -36,7 +40,8 @@ describe('buildChatCompletionRequest', () => {
       conversationId: 'conversation-1',
       forwardedProps: {
         enableBuiltinTools: true,
-        extraBody: { reasoning_effort: 'high' },
+        enableCodeExecution: true,
+        enableWebFetch: false,
         generationType: 'text',
         mcpIds: [1, 2],
         modelId: 'gpt-test',
@@ -88,11 +93,13 @@ describe('buildChatCompletionRequest', () => {
 describe('buildAIChatRegenerateRequest', () => {
   it('builds a regenerate request without requiring chat messages', () => {
     const request = buildAIChatRegenerateRequest({
+      content: '  edited prompt  ',
       conversationId: 'conversation-1',
       params: { ...composerParams, mode: 'regenerate' },
     });
 
     expect(request).toMatchObject({
+      content: 'edited prompt',
       conversationId: 'conversation-1',
       forwardedProps: {
         modelId: 'gpt-test',
@@ -102,7 +109,7 @@ describe('buildAIChatRegenerateRequest', () => {
     expect(request).not.toHaveProperty('messages');
   });
 
-  it('routes user and assistant regeneration to their latest endpoints', () => {
+  it('routes regeneration to the user-message endpoint', () => {
     expect(
       resolveAIChatTransportUrl({
         body: buildAIChatRegenerateRequest({
@@ -114,19 +121,13 @@ describe('buildAIChatRegenerateRequest', () => {
         mode: 'regenerate-from-message',
       }),
     ).toBe('/api/v1/conversations/conversation-1/messages/12/regenerate');
+  });
+});
 
-    expect(
-      resolveAIChatTransportUrl({
-        body: buildAIChatRegenerateRequest({
-          conversationId: 'conversation-1',
-          params: { ...composerParams, mode: 'regenerate' },
-        }),
-        conversationId: 'conversation-1',
-        messageId: 13,
-        mode: 'regenerate-from-response',
-      }),
-    ).toBe(
-      '/api/v1/conversations/conversation-1/messages/13/responses/regenerate',
+describe('resolveAIChatResumeStreamUrl', () => {
+  it('builds the conversation stream resume path', () => {
+    expect(resolveAIChatResumeStreamUrl('conversation-1')).toBe(
+      '/api/v1/conversations/conversation-1/stream',
     );
   });
 });

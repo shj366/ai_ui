@@ -9,7 +9,6 @@ import type { ChatMessageItem } from '../../../runtime/message';
 import { computed, ref } from 'vue';
 
 import {
-  clearAIChatConversationContextApi,
   clearAIChatConversationMessagesApi,
   deleteAIChatConversationApi,
   deleteAIChatMessageApi,
@@ -39,7 +38,8 @@ interface UseChatSessionOptions {
   selectedModelId: Ref<string | undefined>;
   selectedProviderId: Ref<number | undefined>;
   clearTransientMessages: () => void;
-  stopStreaming: () => void;
+  isConversationRequesting?: (conversationId?: string) => boolean;
+  stopStreaming: (conversationId?: string) => void;
   transientRequestError: Ref<null | string>;
 }
 
@@ -62,9 +62,17 @@ export function useChatSession(options: UseChatSessionOptions) {
   const conversationBeforeCursor = ref<string>();
 
   let currentConversationFetchId = 0;
+  const messageCache = new Map<string, ChatMessageItem[]>();
 
   function setActiveConversationKey(value: string) {
+    const previousId = activeConversationId.value;
+    if (previousId && previousId !== value) {
+      messageCache.set(previousId, activeMessages.value);
+    }
     activeConversationId.value = value;
+    if (value && messageCache.has(value)) {
+      activeMessages.value = messageCache.get(value) ?? [];
+    }
   }
 
   function replaceConversationSummaries(items: AIChatConversationResult[]) {
@@ -85,18 +93,12 @@ export function useChatSession(options: UseChatSessionOptions) {
   }
 
   function upsertConversationSummary(summary: AIChatConversationResult) {
-    const index = conversationSummaries.value.findIndex(
-      (item) => item.conversation_id === summary.conversation_id,
-    );
-
-    if (index !== -1) {
-      const next = [...conversationSummaries.value];
-      next[index] = summary;
-      conversationSummaries.value = next;
-      return;
-    }
-
-    conversationSummaries.value = [summary, ...conversationSummaries.value];
+    conversationSummaries.value = [
+      summary,
+      ...conversationSummaries.value.filter(
+        (item) => item.conversation_id !== summary.conversation_id,
+      ),
+    ];
   }
 
   function removeConversationSummary(conversationId: string) {
@@ -113,12 +115,10 @@ export function useChatSession(options: UseChatSessionOptions) {
   });
 
   function createNewConversation() {
-    options.stopStreaming();
     currentConversationFetchId++;
     setActiveConversationKey('');
     activeConversationDetail.value = undefined;
     activeMessages.value = [];
-    options.clearTransientMessages();
     options.draftConversationTitle.value = '新话题';
     detailLoading.value = false;
     options.resetComposerState(true);
@@ -213,6 +213,8 @@ export function useChatSession(options: UseChatSessionOptions) {
     const fetchId = currentConversationFetchId;
     const detail = await getAIChatConversationDetailApi(conversationId);
 
+    syncConversationSummaryFromDetail(detail);
+
     if (
       fetchId !== currentConversationFetchId ||
       activeConversationId.value !== conversationId
@@ -220,7 +222,6 @@ export function useChatSession(options: UseChatSessionOptions) {
       return;
     }
 
-    syncConversationSummaryFromDetail(detail);
     syncActiveMessageMetadataFromDetail(detail);
     activeConversationDetail.value = detail;
     options.transientRequestError.value = null;
@@ -293,10 +294,11 @@ export function useChatSession(options: UseChatSessionOptions) {
       return;
     }
 
-    options.stopStreaming();
-    options.clearTransientMessages();
     options.resetComposerState(true);
     setActiveConversationKey(conversationId);
+    if (options.isConversationRequesting?.(conversationId)) {
+      return;
+    }
     activeConversationDetail.value = undefined;
     await loadConversationDetail(conversationId);
   }
@@ -338,7 +340,7 @@ export function useChatSession(options: UseChatSessionOptions) {
   }
 
   async function removeConversation(conversationId: string) {
-    options.stopStreaming();
+    options.stopStreaming(conversationId);
     await deleteAIChatConversationApi(conversationId);
     removeConversationSummary(conversationId);
     await closeRenameModalIfMatched(conversationId);
@@ -371,7 +373,7 @@ export function useChatSession(options: UseChatSessionOptions) {
   }
 
   async function clearMessages() {
-    options.stopStreaming();
+    options.stopStreaming(activeConversationId.value);
     const conversation = activeConversation.value;
     const conversationId = activeConversationId.value;
 
@@ -409,35 +411,6 @@ export function useChatSession(options: UseChatSessionOptions) {
       });
   }
 
-  async function clearConversationContext() {
-    const conversationId = activeConversationId.value;
-    if (!conversationId) {
-      return;
-    }
-
-    options.stopStreaming();
-    options.clearTransientMessages();
-    await clearAIChatConversationContextApi(conversationId);
-    await loadConversationDetail(conversationId, {
-      forceAutoFollow: false,
-      scrollToBottom: false,
-      showLoading: false,
-    });
-    options.notifySuccess('对话上下文已清除');
-  }
-
-  function confirmClearConversationContext() {
-    options
-      .confirmAction({
-        content:
-          '确认清除当前话题的上下文吗？现有消息会保留展示，后续回复将从分割线之后继续',
-        icon: 'warning',
-      })
-      .then(async () => {
-        await clearConversationContext();
-      });
-  }
-
   async function deleteMessageChain(item: ChatMessageItem) {
     const currentConversationId = activeConversationId.value;
 
@@ -449,7 +422,7 @@ export function useChatSession(options: UseChatSessionOptions) {
       return;
     }
 
-    options.stopStreaming();
+    options.stopStreaming(currentConversationId);
 
     await deleteAIChatMessageApi(currentConversationId, item.message_id);
     activeMessages.value = activeMessages.value.filter(
@@ -492,9 +465,7 @@ export function useChatSession(options: UseChatSessionOptions) {
     activeConversationId,
     activeConversationDetail,
     activeMessages,
-    clearConversationContext,
     clearMessages,
-    confirmClearConversationContext,
     confirmClearMessages,
     confirmRemoveConversation,
     createNewConversation,

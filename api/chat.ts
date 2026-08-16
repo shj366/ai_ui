@@ -33,8 +33,8 @@ export type AIActionResult = null | string;
 
 export interface AIChatForwardedPropsParams {
   enableBuiltinTools?: boolean;
-  extraBody?: null | Recordable<unknown>;
-  extraHeaders?: null | Recordable<string>;
+  enableCodeExecution?: boolean;
+  enableWebFetch?: boolean;
   frequencyPenalty?: null | number;
   generationType?: AIChatGenerationType;
   imageAction?: AIChatImageActionType | null;
@@ -110,11 +110,10 @@ export type AIChatProtocolConversationMessage =
   | (AIChatProtocolMessageMetadata & UserMessage);
 
 export interface AIChatConversationDetailResult {
-  contextClearedTime?: null | string;
-  contextStartMessageId?: null | number;
   conversationId: string;
   createdTime: string;
   id: number;
+  isGenerating?: boolean;
   isPinned: boolean;
   messagesSnapshot: AIChatProtocolMessagesSnapshot;
   modelId: string;
@@ -132,6 +131,7 @@ export type AIChatProtocolMessagesSnapshot = Omit<
 };
 
 export interface AIChatRegenerateParams {
+  content?: null | string;
   conversationId?: null | string;
   forwardedProps: AIChatForwardedPropsParams;
 }
@@ -205,10 +205,10 @@ export interface AIChatComposerParams {
   frequency_penalty?: null | number;
   logit_bias?: null | Recordable<number>;
   stop_sequences?: null | string[];
-  extra_headers?: null | Recordable<string>;
-  extra_body?: null | string;
   thinking?: AIChatThinkingType | boolean | null;
   enable_builtin_tools?: boolean;
+  enable_code_execution?: boolean;
+  enable_web_fetch?: boolean;
   mcp_ids?: null | number[];
   web_search?: AIWebSearchType;
 }
@@ -236,11 +236,10 @@ export interface AIChatConversationListResult {
 }
 
 export interface AIChatConversationDetail {
-  context_cleared_time?: null | string;
-  context_start_message_id?: null | number;
   conversation_id: string;
   created_time: string;
   id: number;
+  is_generating?: boolean;
   is_pinned: boolean;
   message_count?: number;
   messages: AIChatMessageDetail[];
@@ -258,14 +257,7 @@ export interface AIChatConversationPinParams {
   is_pinned: boolean;
 }
 
-export interface AIChatMessageUpdateParams {
-  content: string;
-}
-
-export type AIChatTransportMode =
-  | 'create'
-  | 'regenerate-from-message'
-  | 'regenerate-from-response';
+export type AIChatTransportMode = 'create' | 'regenerate-from-message';
 
 export interface AIChatTransportRequest {
   body: AIChatCompletionParams | AIChatRegenerateParams;
@@ -282,6 +274,7 @@ export interface BuildChatCompletionRequestInput {
 }
 
 export interface BuildChatRegenerateRequestInput {
+  content?: null | string;
   conversationId: string;
   params: AIChatComposerParams;
 }
@@ -434,13 +427,13 @@ export async function clearAIChatConversationMessagesApi(
   );
 }
 
-export async function clearAIChatConversationContextApi(
-  conversationId: string,
-) {
+export async function stopAIChatConversationApi(conversationId: string) {
   return requestClient.post<AIActionResult>(
-    `/api/v1/conversations/${conversationId}/clear-context`,
+    `/api/v1/conversations/${conversationId}/stop`,
   );
 }
+
+export { resolveAIChatResumeStreamUrl } from './chat-transport';
 
 export async function deleteAIChatMessageApi(
   conversationId: string,
@@ -448,16 +441,5 @@ export async function deleteAIChatMessageApi(
 ) {
   return requestClient.delete<AIActionResult>(
     `/api/v1/conversations/${conversationId}/messages/${messageId}`,
-  );
-}
-
-export async function updateAIChatMessageApi(
-  conversationId: string,
-  messageId: number,
-  data: AIChatMessageUpdateParams,
-) {
-  return requestClient.put<AIActionResult>(
-    `/api/v1/conversations/${conversationId}/messages/${messageId}`,
-    data,
   );
 }

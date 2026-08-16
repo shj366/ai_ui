@@ -45,8 +45,8 @@ import { getAIModelOptionsApi } from '../../api';
 import {
   buildChatCompletionRequest,
   buildChatRegenerateRequest,
+  stopAIChatConversationApi,
   updateAIChatConversationApi,
-  updateAIChatMessageApi,
 } from '../../api/chat';
 import {
   buildTransientMessageItems,
@@ -85,7 +85,6 @@ const draftConversationTitle = ref('新话题');
 const selectedProviderId = ref<number>();
 const selectedModelId = ref<string>();
 const editingMessage = ref<ChatMessageItem>();
-const editingMessageIntent = ref<'resend' | 'save'>('save');
 const regeneratingMessageIndex = ref<number>();
 const transientPlacement = ref<{
   insertIndex: number;
@@ -96,6 +95,13 @@ const messageListScrollKey = ref('draft');
 
 const providers = ref<AIProviderModelOptionResult[]>([]);
 const models = ref<AIModelResult[]>([]);
+const selectedModel = computed(() =>
+  models.value.find(
+    (item) =>
+      item.provider_id === selectedProviderId.value &&
+      item.model_id === selectedModelId.value,
+  ),
+);
 
 const resourcesLoading = ref(false);
 
@@ -113,10 +119,14 @@ const {
 
 const {
   abort: abortTransientRequest,
+  abortAllLocal,
+  isConversationRequesting,
   isRequesting,
   messages: transientMessagesState,
   onRequest: onTransientRequest,
+  resumeActiveStream,
   setMessages: setTransientMessages,
+  setViewedConversationId,
   transientRequestError,
 } = useAIChatStream();
 const sending = computed(() => isRequesting.value);
@@ -130,8 +140,14 @@ function resetComposerState(clearPrompt = false) {
   }
 }
 
-function stopStreaming() {
-  abortTransientRequest();
+const stopTargetConversationId = ref('');
+
+function stopStreaming(conversationId?: string) {
+  const targetId = conversationId || stopTargetConversationId.value;
+  abortTransientRequest(targetId);
+  if (targetId) {
+    void stopAIChatConversationApi(targetId).catch(() => undefined);
+  }
 }
 
 function resetMessageListViewport() {
@@ -145,7 +161,6 @@ const {
   activeConversationDetail,
   activeMessages,
   conversationSummaries,
-  confirmClearConversationContext,
   confirmClearMessages,
   confirmRemoveConversation,
   createNewConversation,
@@ -172,6 +187,7 @@ const {
     message.success(content);
   },
   renameConversationFormData,
+  isConversationRequesting,
   resetComposerState,
   resetMessageListViewport,
   clearTransientMessages: () => {
@@ -189,8 +205,47 @@ watch(
   activeConversationId,
   (conversationId) => {
     messageListScrollKey.value = conversationId || 'draft';
+    stopTargetConversationId.value = conversationId;
+    setViewedConversationId(conversationId);
   },
   { immediate: true, flush: 'sync' },
+);
+
+let generatingPollTimer: ReturnType<typeof setInterval> | undefined;
+
+watch(
+  [activeConversationId, activeConversationDetail, isRequesting],
+  () => {
+    if (generatingPollTimer) {
+      clearInterval(generatingPollTimer);
+      generatingPollTimer = undefined;
+    }
+    const conversationId = activeConversationId.value;
+    if (
+      !conversationId ||
+      isConversationRequesting(conversationId) ||
+      !activeConversationDetail.value?.is_generating
+    ) {
+      return;
+    }
+    const lastAssistantIndex = activeMessages.value.findLastIndex(
+      (item) => item.role === 'assistant',
+    );
+    const lastAssistant = activeMessages.value[lastAssistantIndex];
+    if (lastAssistant) {
+      transientPlacement.value = {
+        insertIndex: lastAssistantIndex,
+        replaceMessageIds: [lastAssistant.id],
+      };
+    }
+    void resumeActiveStream(conversationId);
+    generatingPollTimer = setInterval(() => {
+      void loadConversationDetail(conversationId, {
+        scrollToBottom: false,
+        showLoading: false,
+      });
+    }, 1500);
+  },
 );
 
 // Chat settings needs refs from useChatSession for its watchers
@@ -199,8 +254,8 @@ const {
   THINKING_OPTIONS,
   WEB_SEARCH_OPTIONS,
   enableBuiltinTools,
-  extraBody,
-  extraHeaders,
+  enableCodeExecution,
+  enableWebFetch,
   frequencyPenalty,
   generationType,
   generationTypeButtonLabel,
@@ -303,26 +358,40 @@ function handleModelSelectorModelSelect(model: AIModelResult) {
   selectedModelId.value = model.model_id;
 }
 
-function beginEditMessage(
-  item: ChatMessageItem,
-  intent: 'resend' | 'save' = 'save',
-) {
-  if (
-    item.role !== 'user' ||
-    item.message_id === undefined ||
-    item.message_id === null
-  ) {
+function getLastUserMessage() {
+  for (let index = activeMessages.value.length - 1; index >= 0; index -= 1) {
+    const item = activeMessages.value[index];
+    if (
+      item?.role === 'user' &&
+      item.message_id !== undefined &&
+      item.message_id !== null
+    ) {
+      return item;
+    }
+  }
+  return undefined;
+}
+
+function canResendLastUserMessage(item: ChatMessageItem) {
+  const lastUserMessage = getLastUserMessage();
+  return (
+    !sending.value &&
+    lastUserMessage !== undefined &&
+    item.id === lastUserMessage.id
+  );
+}
+
+function beginEditMessage(item: ChatMessageItem) {
+  if (!canResendLastUserMessage(item)) {
     return;
   }
 
   editingMessage.value = item;
-  editingMessageIntent.value = intent;
   regeneratingMessageIndex.value = undefined;
 }
 
 function cancelEditMessage() {
   editingMessage.value = undefined;
-  editingMessageIntent.value = 'save';
 }
 
 function isEditingMessage(item: ChatMessageItem) {
@@ -387,33 +456,17 @@ function resolveTransientPlacement(params: {
   editingMessageId?: null | number;
   editingMessageIndex?: number;
   regenerateMessageId?: number;
-  regenerateSource: 'model' | 'user';
   regenerateTargetMessageIndex?: number;
 }) {
   if (params.regenerateMessageId !== undefined) {
-    if (params.regenerateSource === 'user') {
-      const userIndex = findActiveMessageIndex({
-        message_id: params.regenerateMessageId,
-        message_index: params.regenerateTargetMessageIndex,
-        role: 'user',
-      });
-      return userIndex === -1
-        ? undefined
-        : getImmediateAssistantResponseRange(userIndex);
-    }
-
-    const assistantIndex = findActiveMessageIndex({
+    const userIndex = findActiveMessageIndex({
       message_id: params.regenerateMessageId,
       message_index: params.regenerateTargetMessageIndex,
-      role: 'assistant',
+      role: 'user',
     });
-    const assistantMessage = activeMessages.value[assistantIndex];
-    return assistantMessage
-      ? {
-          insertIndex: assistantIndex,
-          replaceMessageIds: [assistantMessage.id],
-        }
-      : undefined;
+    return userIndex === -1
+      ? undefined
+      : getImmediateAssistantResponseRange(userIndex);
   }
 
   if (
@@ -431,36 +484,6 @@ function resolveTransientPlacement(params: {
   }
 }
 
-async function saveEditedMessage(content: string) {
-  const trimmedContent = content.trim();
-  const targetMessage = editingMessage.value;
-
-  if (
-    !targetMessage ||
-    !targetMessage.conversation_id ||
-    targetMessage.message_id === undefined ||
-    targetMessage.message_id === null
-  ) {
-    return;
-  }
-
-  if (!trimmedContent) {
-    message.warning('请输入消息内容');
-    return;
-  }
-
-  await updateAIChatMessageApi(
-    targetMessage.conversation_id,
-    targetMessage.message_id,
-    {
-      content: trimmedContent,
-    },
-  );
-  updateMessageContent(targetMessage, trimmedContent);
-  cancelEditMessage();
-  message.success('消息内容已保存');
-}
-
 async function resendEditedMessage(content: string) {
   const trimmedContent = content.trim();
   const targetMessage = editingMessage.value;
@@ -468,7 +491,8 @@ async function resendEditedMessage(content: string) {
   if (
     !targetMessage ||
     targetMessage.message_id === undefined ||
-    targetMessage.message_id === null
+    targetMessage.message_id === null ||
+    !canResendLastUserMessage(targetMessage)
   ) {
     return;
   }
@@ -479,33 +503,9 @@ async function resendEditedMessage(content: string) {
   }
 
   updateMessageContent(targetMessage, trimmedContent);
-  if (targetMessage.conversation_id) {
-    await updateAIChatMessageApi(
-      targetMessage.conversation_id,
-      targetMessage.message_id,
-      {
-        content: trimmedContent,
-      },
-    );
-  }
   regeneratingMessageIndex.value = targetMessage.message_index;
   editingMessage.value = undefined;
-  await submitChat(targetMessage.message_id, true, undefined, 'user');
-}
-
-async function regenerateUserMessage(item: ChatMessageItem) {
-  if (
-    item.role !== 'user' ||
-    item.message_id === undefined ||
-    item.message_id === null
-  ) {
-    return;
-  }
-
-  editingMessage.value = undefined;
-  editingMessageIntent.value = 'save';
-  regeneratingMessageIndex.value = item.message_index;
-  await submitChat(item.message_id, true, undefined, 'user');
+  await submitChat(targetMessage.message_id, true, trimmedContent);
 }
 
 async function startRenameConversation(
@@ -566,20 +566,6 @@ async function submitRenameConversation() {
   }
 }
 
-async function regenerateMessage(item: ChatMessageItem) {
-  if (
-    item.role !== 'assistant' ||
-    item.message_id === undefined ||
-    item.message_id === null
-  ) {
-    return;
-  }
-
-  regeneratingMessageIndex.value = item.message_index;
-  editingMessage.value = undefined;
-  await submitChat(item.message_id, false, undefined, 'model');
-}
-
 function createLocalAttachmentBlocks(
   attachments: AIChatComposerAttachment[],
 ): AIChatFileMessageBlock[] {
@@ -602,7 +588,6 @@ async function submitChat(
   regenerateMessageId?: number,
   notifyInvalid = false,
   overridePromptText?: string,
-  regenerateSource: 'model' | 'user' = 'model',
   attachments: AIChatComposerAttachment[] = [],
 ) {
   if (sending.value) {
@@ -655,14 +640,9 @@ async function submitChat(
   try {
     payload = {
       conversation_id: activeConversationId.value,
-      extra_body: extraBody.value.trim() || undefined,
       enable_builtin_tools: enableBuiltinTools.value,
-      extra_headers: parseJsonField<Record<string, string>>(
-        extraHeaders.value,
-        '额外请求头',
-        (value) =>
-          value !== null && typeof value === 'object' && !Array.isArray(value),
-      ),
+      enable_code_execution: enableCodeExecution.value,
+      enable_web_fetch: enableWebFetch.value,
       frequency_penalty: frequencyPenalty.value,
       image_action: imageAction.value,
       image_aspect_ratio: imageAspectRatio.value,
@@ -715,7 +695,23 @@ async function submitChat(
     return false;
   }
 
-  const targetConversationId = activeConversationId.value;
+  const targetConversationId =
+    activeConversationId.value || crypto.randomUUID();
+  const existingSummary = conversationSummaries.value.find(
+    (item) => item.conversation_id === targetConversationId,
+  );
+  if (!activeConversationId.value) {
+    setActiveConversationKey(targetConversationId);
+    draftConversationTitle.value = submittedTitle;
+  }
+  upsertConversationSummary({
+    conversation_id: targetConversationId,
+    created_time: existingSummary?.created_time ?? new Date().toISOString(),
+    id: existingSummary?.id ?? Date.now(),
+    is_pinned: existingSummary?.is_pinned ?? false,
+    title: existingSummary?.title || submittedTitle,
+    updated_time: new Date().toISOString(),
+  });
   if (regenerateMessageId !== undefined && !targetConversationId) {
     message.warning('当前会话不存在，无法重新生成');
     return false;
@@ -725,19 +721,15 @@ async function submitChat(
     editingMessageId,
     editingMessageIndex,
     regenerateMessageId,
-    regenerateSource,
     regenerateTargetMessageIndex,
   });
 
-  if (!activeConversationId.value) {
-    draftConversationTitle.value = submittedTitle;
-  }
   autoFollowMessageScroll.value = true;
   transientRequestError.value = null;
   transientPlacement.value = nextTransientPlacement;
   setTransientMessages([]);
 
-  if (regenerateMessageId === undefined || regenerateSource === 'user') {
+  if (regenerateMessageId === undefined) {
     prompt.value = '';
   }
 
@@ -750,6 +742,7 @@ async function submitChat(
             params: payload,
             promptText: submittedPromptText,
           }),
+          conversationId: targetConversationId,
           localMessages: hasInput
             ? [
                 createProviderUserMessage(
@@ -763,78 +756,51 @@ async function submitChat(
         }
       : {
           body: buildChatRegenerateRequest({
+            content: overridePromptText,
             conversationId: targetConversationId,
             params: payload,
           }),
           conversationId: targetConversationId,
           localMessages: [],
           messageId: regenerateMessageId,
-          mode:
-            regenerateSource === 'user'
-              ? 'regenerate-from-message'
-              : 'regenerate-from-response',
+          mode: 'regenerate-from-message',
         };
 
   await onTransientRequest(requestParams);
 
-  let streamedConversationId = targetConversationId;
-  for (
-    let index = transientMessagesState.value.length - 1;
-    index >= 0;
-    index -= 1
-  ) {
-    const conversationId =
-      transientMessagesState.value[index]?.message.conversation_id;
-    if (conversationId) {
-      streamedConversationId = conversationId;
-      break;
-    }
-  }
-
-  const requestError = transientRequestError.value;
+  const requestConversationId = targetConversationId;
+  const stillViewing = activeConversationId.value === requestConversationId;
+  const requestError = stillViewing ? transientRequestError.value : null;
 
   if (requestError) {
     message.error(requestError);
-
     if (
       regenerateMessageId === undefined &&
       editingMessageIndex === undefined &&
-      !activeConversationId.value
+      stillViewing
     ) {
       prompt.value = submittedPromptText;
     }
+  }
 
-    if (streamedConversationId) {
-      rememberConversationSessionConfig(streamedConversationId);
-      setActiveConversationKey(streamedConversationId);
-      await syncCompletedConversationMetadata(streamedConversationId);
-    }
-
-    transientPlacement.value = undefined;
-    setTransientMessages([]);
-  } else {
-    if (streamedConversationId) {
-      rememberConversationSessionConfig(streamedConversationId);
-      setActiveConversationKey(streamedConversationId);
-      commitSuccessfulTransientMessages();
+  if (requestConversationId) {
+    rememberConversationSessionConfig(requestConversationId);
+    if (stillViewing) {
+      if (!requestError) {
+        commitSuccessfulTransientMessages();
+      }
       setTransientMessages([]);
-      await syncCompletedConversationMetadata(streamedConversationId);
-    } else if (conversationSummaries.value[0]) {
-      await fetchConversations(false);
-      setActiveConversationKey(conversationSummaries.value[0].conversation_id);
-      await loadConversationDetail(
-        conversationSummaries.value[0].conversation_id,
-      );
-      setTransientMessages([]);
+      await syncCompletedConversationMetadata(requestConversationId);
     } else {
-      setTransientMessages([]);
+      void syncCompletedConversationMetadata(requestConversationId);
     }
   }
 
-  editingMessage.value = undefined;
-  editingMessageIntent.value = 'save';
-  regeneratingMessageIndex.value = undefined;
-  transientPlacement.value = undefined;
+  if (stillViewing) {
+    editingMessage.value = undefined;
+    regeneratingMessageIndex.value = undefined;
+    transientPlacement.value = undefined;
+  }
 
   return !requestError;
 }
@@ -1012,17 +978,6 @@ const messageListItems = computed(() => {
       role: message.role === 'assistant' ? 'assistant' : 'user',
       streaming: Boolean(message.role === 'assistant' && message.streaming),
     });
-
-    if (contextDividerAfterMessageId.value === message.id) {
-      items.push({
-        content: '已清除上下文',
-        dividerProps: {
-          plain: true,
-        },
-        key: `${message.id}-context-divider`,
-        role: 'divider',
-      });
-    }
   }
 
   return items;
@@ -1061,47 +1016,6 @@ const activeConversationTitle = computed(() => {
     activeConversation.value?.title ||
     draftConversationTitle.value
   );
-});
-
-const contextDividerAfterMessageId = computed(() => {
-  const detail = activeConversationDetail.value;
-
-  if (!detail?.context_cleared_time || activeMessages.value.length === 0) {
-    return undefined;
-  }
-
-  const clearedAt = new Date(detail.context_cleared_time).getTime();
-
-  if (!Number.isNaN(clearedAt)) {
-    let dividerIndex = -1;
-
-    for (const [index, item] of activeMessages.value.entries()) {
-      const messageTime = new Date(item.created_time).getTime();
-
-      if (Number.isNaN(messageTime) || messageTime <= clearedAt) {
-        dividerIndex = index;
-      }
-    }
-
-    if (dividerIndex >= 0) {
-      return activeMessages.value[dividerIndex]?.id;
-    }
-  }
-
-  if (
-    detail.context_start_message_id !== null &&
-    detail.context_start_message_id !== undefined
-  ) {
-    const anchorIndex = activeMessages.value.findIndex(
-      (item) => item.message_id === detail.context_start_message_id,
-    );
-
-    if (anchorIndex !== -1) {
-      return activeMessages.value[anchorIndex]?.id;
-    }
-  }
-
-  return activeMessages.value[activeMessages.value.length - 1]?.id;
 });
 
 const selectedModelLabel = computed(() => {
@@ -1166,7 +1080,7 @@ function handlePromptInputSubmit(
   _skill?: unknown,
   attachments: AIChatComposerAttachment[] = [],
 ) {
-  return submitChat(undefined, true, messageText, 'model', attachments);
+  return submitChat(undefined, true, messageText, attachments);
 }
 
 function handlePromptInputChange(value: string) {
@@ -1184,17 +1098,14 @@ function confirmDeleteMessage(item: ChatMessageItem) {
 
 const messageListRole = computed(() =>
   createChatMessageListRole({
-    editingMessageIntent: editingMessageIntent.value,
+    canResendLastUserMessage,
     isDark: isDark.value,
     isEditingMessage,
     isThinkingExpanded,
     onBeginEditMessage: beginEditMessage,
     onCancelEditMessage: cancelEditMessage,
     onConfirmDeleteMessage: confirmDeleteMessage,
-    onRegenerateMessage: regenerateMessage,
-    onRegenerateUserMessage: regenerateUserMessage,
     onResendEditedMessage: resendEditedMessage,
-    onSaveEditedMessage: saveEditedMessage,
     getProviderLabel,
     selectedModelId: selectedModelId.value,
     selectedModelLabel: selectedModelLabel.value,
@@ -1209,10 +1120,8 @@ const {
   fetchQuickPhrases: fetchQuickPhrasesFromToolbar,
   renderPromptInputFooter,
 } = usePromptToolbar({
-  activeConversationId: computed(() => activeConversationId.value),
   canClearMessages,
   canCreateNewConversation,
-  confirmClearConversationContext,
   confirmClearMessages,
   createNewConversation,
   enableBuiltinTools,
@@ -1307,7 +1216,10 @@ onActivated(async () => {
 onBeforeUnmount(() => {
   document.documentElement.style.overflow = '';
   document.body.style.overflow = '';
-  abortTransientRequest();
+  if (generatingPollTimer) {
+    clearInterval(generatingPollTimer);
+  }
+  abortAllLocal();
 });
 </script>
 
@@ -1431,8 +1343,8 @@ onBeforeUnmount(() => {
       </template>
       <ChatSettingsPanel
         v-model:enable-builtin-tools="enableBuiltinTools"
-        v-model:extra-body="extraBody"
-        v-model:extra-headers="extraHeaders"
+        v-model:enable-code-execution="enableCodeExecution"
+        v-model:enable-web-fetch="enableWebFetch"
         v-model:frequency-penalty="frequencyPenalty"
         :generation-type="generationType"
         v-model:image-action="imageAction"

@@ -6,12 +6,13 @@ import type {
 import type { AGUIStreamEvent } from '../types/ag-ui';
 import type { AIChatProviderMessage, ChatTransientStatus } from './message';
 
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 import {
   getAIChatRequestHeaders,
   readAIChatErrorMessage,
   resolveAIChatApiUrl,
+  resolveAIChatResumeStreamUrl,
   resolveAIChatTransportUrl,
 } from '../api/chat';
 import { toAIChatMessageFromAGUIEvent } from './ag-ui/runtime-events';
@@ -34,6 +35,21 @@ export interface AIChatStreamMessageInfo {
   id: string;
   message: AIChatProviderMessage;
   status: ChatTransientStatus;
+}
+
+interface ConversationStreamState {
+  abortController: AbortController | null;
+  error: null | string;
+  isRequesting: boolean;
+  lastAssistantRenderAt: number;
+  lastEventId: number;
+  messages: AIChatStreamMessageInfo[];
+  pendingAssistantUpdate: null | {
+    message: AIChatProviderMessage;
+    status: ChatTransientStatus;
+  };
+  renderTimer?: ReturnType<typeof setTimeout>;
+  requestId: number;
 }
 
 const STREAM_RENDER_INTERVAL_MS = 48;
@@ -112,7 +128,7 @@ function parseAGUIStreamEvent(data: string): AGUIStreamEvent | null {
 
 function consumeAGUISSEBuffer(
   buffer: string,
-  onEvent: (event: AGUIStreamEvent) => void,
+  onEvent: (event: AGUIStreamEvent, eventId?: number) => void,
 ) {
   const segments = buffer.split(/\r?\n\r?\n/u);
   const rest = segments.pop() || '';
@@ -127,13 +143,16 @@ function consumeAGUISSEBuffer(
       continue;
     }
 
+    const eventIdLine = lines.find((line) => line.startsWith('id:'));
+    const parsedEventId = Number(eventIdLine?.slice(3).trim());
+    const eventId = Number.isInteger(parsedEventId) ? parsedEventId : undefined;
     const data = lines
       .filter((line) => line.startsWith('data:'))
       .map((line) => line.slice(5).trim())
       .join('\n');
     const event = parseAGUIStreamEvent(data);
     if (event) {
-      onEvent(event);
+      onEvent(event, eventId);
     }
   }
 
@@ -177,118 +196,186 @@ async function readAIChatStream(
   }
 }
 
+function createConversationStreamState(): ConversationStreamState {
+  return {
+    abortController: null,
+    error: null,
+    isRequesting: false,
+    lastAssistantRenderAt: 0,
+    lastEventId: 0,
+    messages: [],
+    pendingAssistantUpdate: null,
+    requestId: 0,
+  };
+}
+
+function resolveStreamKey(requestParams: AIChatProviderRequest) {
+  return (
+    requestParams.conversationId ||
+    requestParams.body.conversationId ||
+    'draft'
+  );
+}
+
 export function useAIChatStream() {
-  const isRequesting = ref(false);
-  const messages = ref<AIChatStreamMessageInfo[]>([]);
-  const transientRequestError = ref<null | string>(null);
+  const viewedConversationId = ref('');
+  const streams = ref<Record<string, ConversationStreamState>>({});
 
-  let abortController: AbortController | null = null;
-  let requestId = 0;
-  let pendingAssistantUpdate: null | {
-    message: AIChatProviderMessage;
-    status: ChatTransientStatus;
-  } = null;
-  let renderTimer: ReturnType<typeof setTimeout> | undefined;
-  let lastAssistantRenderAt = 0;
-  let hasRenderedStreamUpdate = false;
-
-  function setMessages(nextMessages: AIChatStreamMessageInfo[]) {
-    messages.value = nextMessages;
+  function getStreamKey(conversationId?: string) {
+    return conversationId || viewedConversationId.value || 'draft';
   }
 
-  function clearScheduledAssistantRender() {
-    if (!renderTimer) {
+  function ensureStream(conversationId?: string) {
+    const key = getStreamKey(conversationId);
+    const current = streams.value[key];
+    if (current) {
+      return current;
+    }
+    const next = createConversationStreamState();
+    streams.value = { ...streams.value, [key]: next };
+    return next;
+  }
+
+  function replaceStream(
+    conversationId: string,
+    patch: Partial<ConversationStreamState>,
+  ) {
+    const key = getStreamKey(conversationId);
+    const current = ensureStream(key);
+    streams.value = {
+      ...streams.value,
+      [key]: {
+        ...current,
+        ...patch,
+      },
+    };
+  }
+
+  const viewedStream = computed(
+    () => streams.value[getStreamKey()] ?? createConversationStreamState(),
+  );
+  const isRequesting = computed(() => viewedStream.value.isRequesting);
+  const messages = computed(() => viewedStream.value.messages);
+  const transientRequestError = computed({
+    get: () => viewedStream.value.error,
+    set: (value) => {
+      replaceStream(getStreamKey(), { error: value });
+    },
+  });
+
+  function setViewedConversationId(conversationId: string) {
+    viewedConversationId.value = conversationId;
+  }
+
+  function isConversationRequesting(conversationId?: string) {
+    return Boolean(streams.value[getStreamKey(conversationId)]?.isRequesting);
+  }
+
+  function setMessages(
+    nextMessages: AIChatStreamMessageInfo[],
+    conversationId?: string,
+  ) {
+    replaceStream(getStreamKey(conversationId), { messages: nextMessages });
+  }
+
+  function clearScheduledAssistantRender(state: ConversationStreamState) {
+    if (!state.renderTimer) {
       return;
     }
-
-    clearTimeout(renderTimer);
-    renderTimer = undefined;
+    clearTimeout(state.renderTimer);
+    state.renderTimer = undefined;
   }
 
   function updateAssistantMessage(
+    conversationId: string,
     message: AIChatProviderMessage,
     status: ChatTransientStatus,
   ) {
-    const assistantIndex = messages.value.findIndex(
+    const state = ensureStream(conversationId);
+    const assistantIndex = state.messages.findIndex(
       (item) => item.message.role === 'assistant',
     );
     const nextInfo: AIChatStreamMessageInfo = {
       id:
         assistantIndex === -1
           ? buildMessageId('assistant')
-          : messages.value[assistantIndex]?.id || buildMessageId('assistant'),
+          : state.messages[assistantIndex]?.id || buildMessageId('assistant'),
       message,
       status,
     };
-
-    if (assistantIndex === -1) {
-      messages.value = [...messages.value, nextInfo];
-      return;
-    }
-
-    messages.value = messages.value.map((item, index) =>
-      index === assistantIndex ? nextInfo : item,
-    );
+    const nextMessages =
+      assistantIndex === -1
+        ? [...state.messages, nextInfo]
+        : state.messages.map((item, index) =>
+            index === assistantIndex ? nextInfo : item,
+          );
+    replaceStream(conversationId, { messages: nextMessages });
   }
 
-  function flushAssistantMessageUpdate() {
-    if (!pendingAssistantUpdate) {
+  function flushAssistantMessageUpdate(conversationId: string) {
+    const state = ensureStream(conversationId);
+    if (!state.pendingAssistantUpdate) {
       return;
     }
-
-    const nextUpdate = pendingAssistantUpdate;
-    pendingAssistantUpdate = null;
-    lastAssistantRenderAt = Date.now();
-    hasRenderedStreamUpdate = true;
-    updateAssistantMessage(nextUpdate.message, nextUpdate.status);
+    const nextUpdate = state.pendingAssistantUpdate;
+    replaceStream(conversationId, {
+      lastAssistantRenderAt: Date.now(),
+      pendingAssistantUpdate: null,
+    });
+    updateAssistantMessage(conversationId, nextUpdate.message, nextUpdate.status);
   }
 
   function queueAssistantMessageUpdate(
+    conversationId: string,
     message: AIChatProviderMessage,
     status: ChatTransientStatus,
     options: { immediate?: boolean } = {},
   ) {
-    pendingAssistantUpdate = { message, status };
-
-    if (options.immediate || !hasRenderedStreamUpdate) {
-      clearScheduledAssistantRender();
-      flushAssistantMessageUpdate();
+    const state = ensureStream(conversationId);
+    state.pendingAssistantUpdate = { message, status };
+    if (options.immediate || state.lastAssistantRenderAt === 0) {
+      clearScheduledAssistantRender(state);
+      flushAssistantMessageUpdate(conversationId);
       return;
     }
-
-    if (renderTimer) {
+    if (state.renderTimer) {
       return;
     }
-
-    const elapsed = Date.now() - lastAssistantRenderAt;
+    const elapsed = Date.now() - state.lastAssistantRenderAt;
     const delay = Math.max(0, STREAM_RENDER_INTERVAL_MS - elapsed);
-    renderTimer = setTimeout(() => {
-      renderTimer = undefined;
-      flushAssistantMessageUpdate();
+    state.renderTimer = setTimeout(() => {
+      state.renderTimer = undefined;
+      flushAssistantMessageUpdate(conversationId);
     }, delay);
   }
 
   async function onRequest(requestParams: AIChatProviderRequest) {
-    if (isRequesting.value) {
+    const conversationId = resolveStreamKey(requestParams);
+    const state = ensureStream(conversationId);
+    if (state.isRequesting) {
       return;
     }
 
-    const currentRequestId = ++requestId;
+    const currentRequestId = state.requestId + 1;
     const streamState = createAGUIStreamAccumulator();
     let streamBuffer = '';
     let currentAssistantMessage: AIChatProviderMessage | undefined;
+    const abortController = new AbortController();
 
-    function applyStreamEvent(event: AGUIStreamEvent) {
+    function applyStreamEvent(event: AGUIStreamEvent, eventId?: number) {
+      if (typeof eventId === 'number') {
+        replaceStream(conversationId, { lastEventId: eventId });
+      }
+
       const runErrorMessage = resolveAGUIRunErrorMessage(event);
       if (runErrorMessage) {
-        transientRequestError.value = runErrorMessage;
+        replaceStream(conversationId, { error: runErrorMessage });
       }
 
       const message = toAIChatMessageFromAGUIEvent(event, streamState);
-      if (!message || currentRequestId !== requestId) {
+      if (!message || ensureStream(conversationId).requestId !== currentRequestId) {
         return;
       }
-
       if (message.role !== 'assistant') {
         return;
       }
@@ -297,23 +384,30 @@ export function useAIChatStream() {
         currentAssistantMessage,
         message,
       );
-      queueAssistantMessageUpdate(currentAssistantMessage, 'updating');
+      queueAssistantMessageUpdate(
+        conversationId,
+        currentAssistantMessage,
+        'updating',
+      );
     }
 
-    abortController = new AbortController();
-    transientRequestError.value = null;
-    isRequesting.value = true;
-    pendingAssistantUpdate = null;
-    clearScheduledAssistantRender();
-    lastAssistantRenderAt = Date.now();
-    hasRenderedStreamUpdate = false;
-    messages.value = [
-      ...(requestParams.localMessages ?? []).map((message, index) =>
-        createLocalMessageInfo(message, index),
-      ),
-      createAssistantLoadingMessageInfo(),
-    ];
-    currentAssistantMessage = messages.value.at(-1)?.message;
+    replaceStream(conversationId, {
+      abortController,
+      error: null,
+      isRequesting: true,
+      lastAssistantRenderAt: 0,
+      lastEventId: 0,
+      messages: [
+        ...(requestParams.localMessages ?? []).map((message, index) =>
+          createLocalMessageInfo(message, index),
+        ),
+        createAssistantLoadingMessageInfo(),
+      ],
+      pendingAssistantUpdate: null,
+      requestId: currentRequestId,
+    });
+    currentAssistantMessage = ensureStream(conversationId).messages.at(-1)
+      ?.message;
 
     try {
       const response = await fetch(
@@ -331,7 +425,10 @@ export function useAIChatStream() {
       }
 
       await readAIChatStream(response, (text) => {
-        if (!text || currentRequestId !== requestId) {
+        if (
+          !text ||
+          ensureStream(conversationId).requestId !== currentRequestId
+        ) {
           return;
         }
 
@@ -357,16 +454,19 @@ export function useAIChatStream() {
       }
 
       if (currentAssistantMessage) {
-        queueAssistantMessageUpdate(currentAssistantMessage, 'success', {
-          immediate: true,
-        });
+        queueAssistantMessageUpdate(
+          conversationId,
+          currentAssistantMessage,
+          'success',
+          { immediate: true },
+        );
       }
     } catch (error) {
       const normalizedError =
         error instanceof Error ? error : new Error(String(error));
 
       if (normalizedError.name !== 'AbortError') {
-        transientRequestError.value = normalizedError.message;
+        replaceStream(conversationId, { error: normalizedError.message });
       }
 
       currentAssistantMessage = createFallbackMessage(
@@ -374,33 +474,175 @@ export function useAIChatStream() {
         currentAssistantMessage,
       );
       queueAssistantMessageUpdate(
+        conversationId,
         currentAssistantMessage,
         normalizedError.name === 'AbortError' ? 'abort' : 'error',
         { immediate: true },
       );
     } finally {
-      if (currentRequestId === requestId) {
-        clearScheduledAssistantRender();
-        isRequesting.value = false;
-        abortController = null;
+      const latest = ensureStream(conversationId);
+      if (latest.requestId === currentRequestId) {
+        clearScheduledAssistantRender(latest);
+        replaceStream(conversationId, {
+          abortController: null,
+          isRequesting: false,
+        });
       }
     }
   }
 
-  function abort() {
-    if (!isRequesting.value || !abortController) {
-      return;
+  async function resumeActiveStream(conversationId: string) {
+    const state = ensureStream(conversationId);
+    if (state.isRequesting) {
+      return false;
     }
 
-    abortController.abort();
+    const currentRequestId = state.requestId + 1;
+    const streamState = createAGUIStreamAccumulator();
+    let streamBuffer = '';
+    let currentAssistantMessage: AIChatProviderMessage | undefined;
+    const abortController = new AbortController();
+    const lastEventId = state.lastEventId;
+
+    function applyStreamEvent(event: AGUIStreamEvent, eventId?: number) {
+      if (typeof eventId === 'number') {
+        replaceStream(conversationId, { lastEventId: eventId });
+      }
+
+      const runErrorMessage = resolveAGUIRunErrorMessage(event);
+      if (runErrorMessage) {
+        replaceStream(conversationId, { error: runErrorMessage });
+      }
+
+      const message = toAIChatMessageFromAGUIEvent(event, streamState);
+      if (!message || ensureStream(conversationId).requestId !== currentRequestId) {
+        return;
+      }
+      if (message.role !== 'assistant') {
+        return;
+      }
+
+      currentAssistantMessage = mergeStreamMessage(
+        currentAssistantMessage,
+        message,
+      );
+      queueAssistantMessageUpdate(
+        conversationId,
+        currentAssistantMessage,
+        'updating',
+      );
+    }
+
+    replaceStream(conversationId, {
+      abortController,
+      error: null,
+      isRequesting: true,
+      lastAssistantRenderAt: 0,
+      pendingAssistantUpdate: null,
+      requestId: currentRequestId,
+    });
+
+    try {
+      const headers = {
+        ...getAIChatRequestHeaders(),
+        ...(lastEventId > 0 ? { 'Last-Event-ID': String(lastEventId) } : {}),
+      };
+      const response = await fetch(
+        resolveAIChatApiUrl(resolveAIChatResumeStreamUrl(conversationId)),
+        {
+          headers,
+          method: 'GET',
+          signal: abortController.signal,
+        },
+      );
+
+      if (response.status === 204) {
+        return false;
+      }
+
+      if (!response.ok) {
+        throw new Error(await readAIChatErrorMessage(response));
+      }
+
+      await readAIChatStream(response, (text) => {
+        if (
+          !text ||
+          ensureStream(conversationId).requestId !== currentRequestId
+        ) {
+          return;
+        }
+
+        streamBuffer = consumeAGUISSEBuffer(
+          `${streamBuffer}${text}`,
+          applyStreamEvent,
+        );
+      });
+
+      if (streamBuffer.trim()) {
+        streamBuffer = consumeAGUISSEBuffer(
+          `${streamBuffer}\n\n`,
+          applyStreamEvent,
+        );
+      }
+
+      if (currentAssistantMessage) {
+        queueAssistantMessageUpdate(
+          conversationId,
+          currentAssistantMessage,
+          'success',
+          { immediate: true },
+        );
+      }
+      return true;
+    } catch (error) {
+      const normalizedError =
+        error instanceof Error ? error : new Error(String(error));
+
+      if (normalizedError.name !== 'AbortError') {
+        replaceStream(conversationId, { error: normalizedError.message });
+      }
+      return false;
+    } finally {
+      const latest = ensureStream(conversationId);
+      if (latest.requestId === currentRequestId) {
+        clearScheduledAssistantRender(latest);
+        replaceStream(conversationId, {
+          abortController: null,
+          isRequesting: false,
+        });
+      }
+    }
+  }
+
+  function abort(conversationId?: string) {
+    const state = streams.value[getStreamKey(conversationId)];
+    if (!state?.isRequesting || !state.abortController) {
+      return;
+    }
+    state.abortController.abort();
+  }
+
+  function abortAllLocal() {
+    for (const [conversationId, state] of Object.entries(streams.value)) {
+      if (state.isRequesting && state.abortController) {
+        state.abortController.abort();
+        replaceStream(conversationId, {
+          abortController: null,
+        });
+      }
+    }
   }
 
   return {
     abort,
+    abortAllLocal,
+    isConversationRequesting,
     isRequesting,
     messages,
     onRequest,
+    resumeActiveStream,
     setMessages,
+    setViewedConversationId,
     transientRequestError,
   };
 }

@@ -1,7 +1,5 @@
 import type { InputContent } from '@ag-ui/core';
 
-import type { Recordable } from '@vben/types';
-
 import type { AIChatAttachmentType } from '../types/message';
 import type {
   AIChatComposerAttachment,
@@ -21,33 +19,13 @@ export interface AIChatRequestDependencies {
   resolveUrl: (url: string) => string;
 }
 
-function parseExtraBody(
-  raw: null | string | undefined,
-): Recordable<unknown> | undefined {
-  const text = raw?.trim();
-  if (!text) {
-    return undefined;
-  }
-
-  try {
-    const parsed = JSON.parse(text) as unknown;
-    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-      return parsed as Recordable<unknown>;
-    }
-  } catch {
-    return undefined;
-  }
-
-  return undefined;
-}
-
 function toForwardedProps(
   params: AIChatComposerParams,
 ): AIChatForwardedPropsParams {
   return {
     enableBuiltinTools: params.enable_builtin_tools ?? true,
-    extraBody: parseExtraBody(params.extra_body),
-    extraHeaders: params.extra_headers ?? undefined,
+    enableCodeExecution: params.enable_code_execution,
+    enableWebFetch: params.enable_web_fetch,
     frequencyPenalty: params.frequency_penalty,
     generationType: params.generation_type ?? 'text',
     imageAction: params.image_action,
@@ -149,6 +127,7 @@ export function buildAIChatRegenerateRequest(
   input: BuildChatRegenerateRequestInput,
 ): AIChatRegenerateParams {
   return {
+    ...(input.content?.trim() ? { content: input.content.trim() } : {}),
     conversationId: input.conversationId,
     forwardedProps: toForwardedProps(input.params),
   };

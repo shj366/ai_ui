@@ -8,8 +8,9 @@ export function resolveAIChatTransportUrl(request: AIChatTransportRequest) {
     case 'regenerate-from-message': {
       return `/api/v1/conversations/${request.conversationId}/messages/${request.messageId}/regenerate`;
     }
-    case 'regenerate-from-response': {
-      return `/api/v1/conversations/${request.conversationId}/messages/${request.messageId}/responses/regenerate`;
-    }
   }
+}
+
+export function resolveAIChatResumeStreamUrl(conversationId: string) {
+  return `/api/v1/conversations/${conversationId}/stream`;
 }
