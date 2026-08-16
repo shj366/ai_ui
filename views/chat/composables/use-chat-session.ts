@@ -93,12 +93,26 @@ export function useChatSession(options: UseChatSessionOptions) {
   }
 
   function upsertConversationSummary(summary: AIChatConversationResult) {
-    conversationSummaries.value = [
-      summary,
-      ...conversationSummaries.value.filter(
-        (item) => item.conversation_id !== summary.conversation_id,
-      ),
-    ];
+    const items = [...conversationSummaries.value];
+    const index = items.findIndex(
+      (item) => item.conversation_id === summary.conversation_id,
+    );
+    if (index >= 0) {
+      items[index] = summary;
+      conversationSummaries.value = items;
+      return;
+    }
+    if (summary.is_pinned) {
+      items.unshift(summary);
+    } else {
+      const insertAt = items.findIndex((item) => !item.is_pinned);
+      if (insertAt === -1) {
+        items.push(summary);
+      } else {
+        items.splice(insertAt, 0, summary);
+      }
+    }
+    conversationSummaries.value = items;
   }
 
   function removeConversationSummary(conversationId: string) {
@@ -179,11 +193,13 @@ export function useChatSession(options: UseChatSessionOptions) {
     });
   }
 
-  async function fetchConversations(append = false) {
-    if (append) {
-      sidebarMoreLoading.value = true;
-    } else {
-      sidebarLoading.value = true;
+  async function fetchConversations(append = false, silent = false) {
+    if (!silent) {
+      if (append) {
+        sidebarMoreLoading.value = true;
+      } else {
+        sidebarLoading.value = true;
+      }
     }
 
     try {
@@ -201,10 +217,12 @@ export function useChatSession(options: UseChatSessionOptions) {
       hasMoreConversations.value = data.has_more;
       conversationBeforeCursor.value = data.next_cursor || undefined;
     } finally {
-      if (append) {
-        sidebarMoreLoading.value = false;
-      } else {
-        sidebarLoading.value = false;
+      if (!silent) {
+        if (append) {
+          sidebarMoreLoading.value = false;
+        } else {
+          sidebarLoading.value = false;
+        }
       }
     }
   }
@@ -214,6 +232,7 @@ export function useChatSession(options: UseChatSessionOptions) {
     const detail = await getAIChatConversationDetailApi(conversationId);
 
     syncConversationSummaryFromDetail(detail);
+    await fetchConversations(false, true);
 
     if (
       fetchId !== currentConversationFetchId ||
