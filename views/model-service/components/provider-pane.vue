@@ -207,9 +207,6 @@ useInfiniteScroll(
     >
       <div>
         <div class="text-sm font-medium text-foreground">供应商</div>
-        <div class="text-xs text-muted-foreground">
-          选择供应商后查看右侧模型
-        </div>
       </div>
       <VbenButton size="sm" @click="() => modalApi.setData(null).open()">
         <MaterialSymbolsAdd class="size-4" />

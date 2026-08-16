@@ -270,10 +270,6 @@ async function submitBatchAddModels() {
   const providerId = props.provider.id;
   const payload: AIBatchCreateModelsParams = {
     items: selectedProviderModelIds.value.map((modelId) => ({
-      context_keep_messages: 60,
-      context_max_messages: null,
-      context_max_part_chars: null,
-      context_max_tokens: null,
       model_id: modelId,
       provider_id: providerId,
       remark: null,

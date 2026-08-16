@@ -81,10 +81,6 @@ export interface AIModelParams {
   provider_id: number;
   model_id: string;
   status: AIStatusType;
-  context_max_part_chars?: null | number;
-  context_max_messages?: null | number;
-  context_keep_messages?: number;
-  context_max_tokens?: null | number;
   remark?: null | string;
 }
 
