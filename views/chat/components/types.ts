@@ -81,7 +81,6 @@ export interface ChatMessageRoleRenderResult extends ChatMessageCardProps {
   onEditCancel?: () => void;
   onEditConfirm?: (value: string) => void;
   onEditResend?: (value: string) => void;
-  onEditSave?: (value: string) => void;
   placement?: 'end' | 'start';
   shape?: string;
   streaming?: boolean;

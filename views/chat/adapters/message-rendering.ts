@@ -90,20 +90,14 @@ import {
 } from './message-process-fold';
 
 export interface CreateChatMessageListRoleOptions {
-  editingMessageIntent: 'resend' | 'save';
+  canResendLastUserMessage: (message: ChatMessageItem) => boolean;
   isDark: boolean;
   isEditingMessage: (message: ChatMessageItem) => boolean;
   isThinkingExpanded: (message: ChatMessageItem, panelKey?: string) => boolean;
-  onBeginEditMessage: (
-    message: ChatMessageItem,
-    intent: 'resend' | 'save',
-  ) => void;
+  onBeginEditMessage: (message: ChatMessageItem) => void;
   onCancelEditMessage: () => void;
   onConfirmDeleteMessage: (message: ChatMessageItem) => void;
-  onRegenerateMessage: (message: ChatMessageItem) => void;
-  onRegenerateUserMessage: (message: ChatMessageItem) => void;
   onResendEditedMessage: (content: string) => void;
-  onSaveEditedMessage: (content: string) => void;
   getProviderLabel?: (providerId?: null | number) => string | undefined;
   selectedModelLabel?: string;
   selectedModelId?: null | string;
@@ -1611,10 +1605,9 @@ function getMessageActionItems(
   message: ChatMessageItem,
   options: Pick<
     CreateChatMessageListRoleOptions,
+    | 'canResendLastUserMessage'
     | 'onBeginEditMessage'
     | 'onConfirmDeleteMessage'
-    | 'onRegenerateMessage'
-    | 'onRegenerateUserMessage'
   >,
 ): ActionsProps['items'] {
   const items: ActionsProps['items'] = [
@@ -1627,29 +1620,12 @@ function getMessageActionItems(
     },
   ];
 
-  if (message.role === 'user') {
-    items.push(
-      {
-        icon: h(IconifyIcon, { class: 'size-3.5', icon: 'mdi:refresh' }),
-        key: 'regenerate',
-        label: '重新生成',
-        onItemClick: () => options.onRegenerateUserMessage(message),
-      },
-      {
-        icon: h(IconifyIcon, { class: 'size-3.5', icon: 'mdi:pencil-outline' }),
-        key: 'edit',
-        label: '编辑',
-        onItemClick: () => options.onBeginEditMessage(message, 'save'),
-      },
-    );
-  }
-
-  if (message.role === 'assistant') {
+  if (options.canResendLastUserMessage(message)) {
     items.push({
-      icon: h(IconifyIcon, { class: 'size-3.5', icon: 'mdi:refresh' }),
-      key: 'retry',
-      label: '重新生成',
-      onItemClick: () => options.onRegenerateMessage(message),
+      icon: h(IconifyIcon, { class: 'size-3.5', icon: 'mdi:pencil-outline' }),
+      key: 'edit',
+      label: '编辑后重发',
+      onItemClick: () => options.onBeginEditMessage(message),
     });
   }
 
@@ -1668,10 +1644,9 @@ function renderMessageFooter(
   message: ChatMessageItem,
   options: Pick<
     CreateChatMessageListRoleOptions,
+    | 'canResendLastUserMessage'
     | 'onBeginEditMessage'
     | 'onConfirmDeleteMessage'
-    | 'onRegenerateMessage'
-    | 'onRegenerateUserMessage'
   >,
 ) {
   return h(Actions, {
@@ -1697,7 +1672,9 @@ export function createChatMessageListRole(
       return {
         editable: false,
         loading: isAssistantMessageLoading(message),
-        footer: renderMessageFooter(message, options),
+        footer: message.streaming
+          ? undefined
+          : renderMessageFooter(message, options),
         footerPlacement: 'outer-start',
         header: renderMessageHeader(message, options),
         placement: 'start',
@@ -1722,19 +1699,15 @@ export function createChatMessageListRole(
           ? {
               cancelText: '取消',
               editing: true,
-              okText:
-                options.editingMessageIntent === 'resend' ? '重发' : '保存',
+              okText: '重发',
             }
           : false,
         footer: renderMessageFooter(message, options),
         footerPlacement: 'outer-end',
         onEditCancel: options.onCancelEditMessage,
         onEditConfirm: (value) =>
-          options.editingMessageIntent === 'resend'
-            ? options.onResendEditedMessage(String(value))
-            : options.onSaveEditedMessage(String(value)),
+          options.onResendEditedMessage(String(value)),
         onEditResend: (value) => options.onResendEditedMessage(String(value)),
-        onEditSave: (value) => options.onSaveEditedMessage(String(value)),
         placement: 'end',
         shape: 'default',
         variant: 'outlined',
