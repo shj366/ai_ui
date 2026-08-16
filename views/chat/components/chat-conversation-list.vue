@@ -258,14 +258,6 @@ function renderEditable(
             }),
             renderEditableIconButton({
               class:
-                'rounded-md text-muted-foreground hover:bg-muted hover:text-foreground',
-              icon: 'mdi:content-save-outline',
-              onClick: () =>
-                confirmEdit(item, config.onEditSave ?? config.onEditConfirm),
-              tooltip: '保存',
-            }),
-            renderEditableIconButton({
-              class:
                 'rounded-md text-primary hover:bg-primary/10 hover:text-primary',
               icon: 'mdi:send-outline',
               onClick: () =>
@@ -370,7 +362,7 @@ function renderMessage(item: ChatMessageListItem) {
                   ),
                 },
                 () => [config.footer],
-          )
+              )
             : null,
         ],
       ),

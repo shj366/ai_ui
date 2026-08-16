@@ -66,10 +66,23 @@ function startOfLocalDay(date: Date) {
 }
 
 function getConversationTime(conversation: AIChatConversationResult) {
-  const value = conversation.created_time;
+  const value = conversation.updated_time || conversation.created_time;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? new Date(0) : date;
 }
+
+function formatYearMonth(date: Date) {
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  return `${date.getFullYear()}-${month}`;
+}
+
+const CONVERSATION_GROUP_ORDER = [
+  '置顶',
+  '今天',
+  '昨天',
+  '7 天内',
+  '30 天内',
+];
 
 function getConversationGroup(conversation: AIChatConversationResult) {
   if (conversation.is_pinned) {
@@ -77,7 +90,8 @@ function getConversationGroup(conversation: AIChatConversationResult) {
   }
 
   const today = startOfLocalDay(new Date());
-  const target = startOfLocalDay(getConversationTime(conversation));
+  const targetDate = getConversationTime(conversation);
+  const target = startOfLocalDay(targetDate);
   const diffDays = Math.floor((today.getTime() - target.getTime()) / DAY_MS);
 
   if (diffDays <= 0) {
@@ -87,9 +101,29 @@ function getConversationGroup(conversation: AIChatConversationResult) {
     return '昨天';
   }
   if (diffDays < 7) {
-    return '近 7 天';
+    return '7 天内';
   }
-  return '更早';
+  if (diffDays < 30) {
+    return '30 天内';
+  }
+  return formatYearMonth(targetDate);
+}
+
+export function compareConversationGroups(left: string, right: string) {
+  const leftFixed = CONVERSATION_GROUP_ORDER.indexOf(left);
+  const rightFixed = CONVERSATION_GROUP_ORDER.indexOf(right);
+
+  if (leftFixed !== -1 || rightFixed !== -1) {
+    if (leftFixed === -1) {
+      return 1;
+    }
+    if (rightFixed === -1) {
+      return -1;
+    }
+    return leftFixed - rightFixed;
+  }
+
+  return right.localeCompare(left);
 }
 
 export function buildConversationSidebarItems(

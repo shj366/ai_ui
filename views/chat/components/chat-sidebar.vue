@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import type {
-  ConversationSidebarCreation,
-  ConversationSidebarItem,
-  ConversationSidebarMenu,
+import {
+  compareConversationGroups,
+  type ConversationSidebarCreation,
+  type ConversationSidebarItem,
+  type ConversationSidebarMenu,
 } from '../adapters/conversation-items';
 
 import { computed, ref } from 'vue';
@@ -41,7 +42,9 @@ const groupedItems = computed(() => {
     groups.push({ group, items });
   }
 
-  return groups;
+  return groups.sort((left, right) =>
+    compareConversationGroups(left.group, right.group),
+  );
 });
 
 useInfiniteScroll(
@@ -75,7 +78,7 @@ function selectItem(item: ConversationSidebarItem) {
         <template #icon>
           <IconifyIcon class="size-4" icon="mdi:message-plus-outline" />
         </template>
-        新建话题
+        新建对话
       </a-button>
     </div>
 
@@ -109,8 +112,7 @@ function selectItem(item: ConversationSidebarItem) {
                 <VNodeRenderer :node="item.label" />
               </button>
               <div
-                class="absolute right-2 top-1/2 z-10 -translate-y-1/2 opacity-0 transition-opacity group-hover/item:opacity-100"
-                :class="activeKey === item.key ? 'opacity-100' : undefined"
+                class="pointer-events-none absolute right-2 top-1/2 z-10 -translate-y-1/2 opacity-0 transition-opacity group-hover/item:pointer-events-auto group-hover/item:opacity-100"
               >
                 <a-popover placement="rightTop" trigger="click">
                   <template #content>
