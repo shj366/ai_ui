@@ -17,6 +17,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export interface ConversationSidebarItem {
   conversation: AIChatConversationResult;
   group: string;
+  isGenerating: boolean;
   isPinned: boolean;
   key: string;
   label: VNodeChild;
@@ -42,22 +43,20 @@ export type ConversationSidebarMenu = (
 ) => ConversationSidebarMenuItem[];
 
 function renderConversationLabel(conversation: AIChatConversationResult) {
-  return h('div', { class: 'min-w-0' }, [
-    h('div', { class: 'flex min-w-0 items-center gap-1.5' }, [
-      h(
-        'span',
-        {
-          class: 'min-w-0 flex-1 truncate text-[13px] font-medium leading-5',
-          title: conversation.title,
-        },
-        conversation.title,
-      ),
-      conversation.is_pinned
-        ? h(Pin, {
-            class: 'size-3.5 shrink-0 text-muted-foreground',
-          })
-        : null,
-    ]),
+  return h('div', { class: 'flex min-w-0 items-center gap-1.5' }, [
+    h(
+      'span',
+      {
+        class: 'min-w-0 flex-1 truncate text-[13px] font-medium leading-5',
+        title: conversation.title,
+      },
+      conversation.title,
+    ),
+    conversation.is_pinned
+      ? h(Pin, {
+          class: 'size-3.5 shrink-0 text-muted-foreground',
+        })
+      : null,
   ]);
 }
 
@@ -66,8 +65,7 @@ function startOfLocalDay(date: Date) {
 }
 
 function getConversationTime(conversation: AIChatConversationResult) {
-  const value = conversation.updated_time || conversation.created_time;
-  const date = new Date(value);
+  const date = new Date(conversation.created_time);
   return Number.isNaN(date.getTime()) ? new Date(0) : date;
 }
 
@@ -132,6 +130,7 @@ export function buildConversationSidebarItems(
   return conversations.map((conversation) => ({
     conversation,
     group: getConversationGroup(conversation),
+    isGenerating: Boolean(conversation.is_generating),
     isPinned: Boolean(conversation.is_pinned),
     key: conversation.conversation_id,
     label: renderConversationLabel(conversation),

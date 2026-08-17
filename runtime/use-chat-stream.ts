@@ -12,7 +12,6 @@ import {
   getAIChatRequestHeaders,
   readAIChatErrorMessage,
   resolveAIChatApiUrl,
-  resolveAIChatResumeStreamUrl,
   resolveAIChatTransportUrl,
 } from '../api/chat';
 import { toAIChatMessageFromAGUIEvent } from './ag-ui/runtime-events';
@@ -42,7 +41,6 @@ interface ConversationStreamState {
   error: null | string;
   isRequesting: boolean;
   lastAssistantRenderAt: number;
-  lastEventId: number;
   messages: AIChatStreamMessageInfo[];
   pendingAssistantUpdate: null | {
     message: AIChatProviderMessage;
@@ -51,6 +49,12 @@ interface ConversationStreamState {
   renderTimer?: ReturnType<typeof setTimeout>;
   requestId: number;
 }
+
+export type AIChatStreamOutcome =
+  | 'completed'
+  | 'detached'
+  | 'failed'
+  | 'ignored';
 
 const STREAM_RENDER_INTERVAL_MS = 48;
 
@@ -128,7 +132,7 @@ function parseAGUIStreamEvent(data: string): AGUIStreamEvent | null {
 
 function consumeAGUISSEBuffer(
   buffer: string,
-  onEvent: (event: AGUIStreamEvent, eventId?: number) => void,
+  onEvent: (event: AGUIStreamEvent) => void,
 ) {
   const segments = buffer.split(/\r?\n\r?\n/u);
   const rest = segments.pop() || '';
@@ -143,16 +147,13 @@ function consumeAGUISSEBuffer(
       continue;
     }
 
-    const eventIdLine = lines.find((line) => line.startsWith('id:'));
-    const parsedEventId = Number(eventIdLine?.slice(3).trim());
-    const eventId = Number.isInteger(parsedEventId) ? parsedEventId : undefined;
     const data = lines
       .filter((line) => line.startsWith('data:'))
       .map((line) => line.slice(5).trim())
       .join('\n');
     const event = parseAGUIStreamEvent(data);
     if (event) {
-      onEvent(event, eventId);
+      onEvent(event);
     }
   }
 
@@ -202,7 +203,6 @@ function createConversationStreamState(): ConversationStreamState {
     error: null,
     isRequesting: false,
     lastAssistantRenderAt: 0,
-    lastEventId: 0,
     messages: [],
     pendingAssistantUpdate: null,
     requestId: 0,
@@ -211,9 +211,7 @@ function createConversationStreamState(): ConversationStreamState {
 
 function resolveStreamKey(requestParams: AIChatProviderRequest) {
   return (
-    requestParams.conversationId ||
-    requestParams.body.conversationId ||
-    'draft'
+    requestParams.conversationId || requestParams.body.conversationId || 'draft'
   );
 }
 
@@ -322,7 +320,11 @@ export function useAIChatStream() {
       lastAssistantRenderAt: Date.now(),
       pendingAssistantUpdate: null,
     });
-    updateAssistantMessage(conversationId, nextUpdate.message, nextUpdate.status);
+    updateAssistantMessage(
+      conversationId,
+      nextUpdate.message,
+      nextUpdate.status,
+    );
   }
 
   function queueAssistantMessageUpdate(
@@ -353,7 +355,7 @@ export function useAIChatStream() {
     const conversationId = resolveStreamKey(requestParams);
     const state = ensureStream(conversationId);
     if (state.isRequesting) {
-      return;
+      return 'ignored' satisfies AIChatStreamOutcome;
     }
 
     const currentRequestId = state.requestId + 1;
@@ -362,18 +364,17 @@ export function useAIChatStream() {
     let currentAssistantMessage: AIChatProviderMessage | undefined;
     const abortController = new AbortController();
 
-    function applyStreamEvent(event: AGUIStreamEvent, eventId?: number) {
-      if (typeof eventId === 'number') {
-        replaceStream(conversationId, { lastEventId: eventId });
-      }
-
+    function applyStreamEvent(event: AGUIStreamEvent) {
       const runErrorMessage = resolveAGUIRunErrorMessage(event);
       if (runErrorMessage) {
         replaceStream(conversationId, { error: runErrorMessage });
       }
 
       const message = toAIChatMessageFromAGUIEvent(event, streamState);
-      if (!message || ensureStream(conversationId).requestId !== currentRequestId) {
+      if (
+        !message ||
+        ensureStream(conversationId).requestId !== currentRequestId
+      ) {
         return;
       }
       if (message.role !== 'assistant') {
@@ -396,7 +397,6 @@ export function useAIChatStream() {
       error: null,
       isRequesting: true,
       lastAssistantRenderAt: 0,
-      lastEventId: 0,
       messages: [
         ...(requestParams.localMessages ?? []).map((message, index) =>
           createLocalMessageInfo(message, index),
@@ -406,8 +406,8 @@ export function useAIChatStream() {
       pendingAssistantUpdate: null,
       requestId: currentRequestId,
     });
-    currentAssistantMessage = ensureStream(conversationId).messages.at(-1)
-      ?.message;
+    currentAssistantMessage =
+      ensureStream(conversationId).messages.at(-1)?.message;
 
     try {
       const response = await fetch(
@@ -461,6 +461,7 @@ export function useAIChatStream() {
           { immediate: true },
         );
       }
+      return 'completed' satisfies AIChatStreamOutcome;
     } catch (error) {
       const normalizedError =
         error instanceof Error ? error : new Error(String(error));
@@ -479,129 +480,9 @@ export function useAIChatStream() {
         normalizedError.name === 'AbortError' ? 'abort' : 'error',
         { immediate: true },
       );
-    } finally {
-      const latest = ensureStream(conversationId);
-      if (latest.requestId === currentRequestId) {
-        clearScheduledAssistantRender(latest);
-        replaceStream(conversationId, {
-          abortController: null,
-          isRequesting: false,
-        });
-      }
-    }
-  }
-
-  async function resumeActiveStream(conversationId: string) {
-    const state = ensureStream(conversationId);
-    if (state.isRequesting) {
-      return false;
-    }
-
-    const currentRequestId = state.requestId + 1;
-    const streamState = createAGUIStreamAccumulator();
-    let streamBuffer = '';
-    let currentAssistantMessage: AIChatProviderMessage | undefined;
-    const abortController = new AbortController();
-    const lastEventId = state.lastEventId;
-
-    function applyStreamEvent(event: AGUIStreamEvent, eventId?: number) {
-      if (typeof eventId === 'number') {
-        replaceStream(conversationId, { lastEventId: eventId });
-      }
-
-      const runErrorMessage = resolveAGUIRunErrorMessage(event);
-      if (runErrorMessage) {
-        replaceStream(conversationId, { error: runErrorMessage });
-      }
-
-      const message = toAIChatMessageFromAGUIEvent(event, streamState);
-      if (!message || ensureStream(conversationId).requestId !== currentRequestId) {
-        return;
-      }
-      if (message.role !== 'assistant') {
-        return;
-      }
-
-      currentAssistantMessage = mergeStreamMessage(
-        currentAssistantMessage,
-        message,
-      );
-      queueAssistantMessageUpdate(
-        conversationId,
-        currentAssistantMessage,
-        'updating',
-      );
-    }
-
-    replaceStream(conversationId, {
-      abortController,
-      error: null,
-      isRequesting: true,
-      lastAssistantRenderAt: 0,
-      pendingAssistantUpdate: null,
-      requestId: currentRequestId,
-    });
-
-    try {
-      const headers = {
-        ...getAIChatRequestHeaders(),
-        ...(lastEventId > 0 ? { 'Last-Event-ID': String(lastEventId) } : {}),
-      };
-      const response = await fetch(
-        resolveAIChatApiUrl(resolveAIChatResumeStreamUrl(conversationId)),
-        {
-          headers,
-          method: 'GET',
-          signal: abortController.signal,
-        },
-      );
-
-      if (response.status === 204) {
-        return false;
-      }
-
-      if (!response.ok) {
-        throw new Error(await readAIChatErrorMessage(response));
-      }
-
-      await readAIChatStream(response, (text) => {
-        if (
-          !text ||
-          ensureStream(conversationId).requestId !== currentRequestId
-        ) {
-          return;
-        }
-
-        streamBuffer = consumeAGUISSEBuffer(
-          `${streamBuffer}${text}`,
-          applyStreamEvent,
-        );
-      });
-
-      if (streamBuffer.trim()) {
-        streamBuffer = consumeAGUISSEBuffer(
-          `${streamBuffer}\n\n`,
-          applyStreamEvent,
-        );
-      }
-
-      if (currentAssistantMessage) {
-        queueAssistantMessageUpdate(
-          conversationId,
-          currentAssistantMessage,
-          'success',
-          { immediate: true },
-        );
-      }
-      return true;
-    } catch (error) {
-      const normalizedError =
-        error instanceof Error ? error : new Error(String(error));
-
-      if (normalizedError.name !== 'AbortError') {
-        replaceStream(conversationId, { error: normalizedError.message });
-      }
-      return false;
+      return normalizedError.name === 'AbortError'
+        ? ('detached' satisfies AIChatStreamOutcome)
+        : ('failed' satisfies AIChatStreamOutcome);
     } finally {
       const latest = ensureStream(conversationId);
       if (latest.requestId === currentRequestId) {
@@ -622,7 +503,7 @@ export function useAIChatStream() {
     state.abortController.abort();
   }
 
-  function abortAllLocal() {
+  function detachAll() {
     for (const [conversationId, state] of Object.entries(streams.value)) {
       if (state.isRequesting && state.abortController) {
         state.abortController.abort();
@@ -635,12 +516,11 @@ export function useAIChatStream() {
 
   return {
     abort,
-    abortAllLocal,
+    detachAll,
     isConversationRequesting,
     isRequesting,
     messages,
     onRequest,
-    resumeActiveStream,
     setMessages,
     setViewedConversationId,
     transientRequestError,

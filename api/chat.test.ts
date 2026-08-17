@@ -4,10 +4,7 @@ import {
   buildAIChatCompletionRequest,
   buildAIChatRegenerateRequest,
 } from './chat-request';
-import {
-  resolveAIChatResumeStreamUrl,
-  resolveAIChatTransportUrl,
-} from './chat-transport';
+import { resolveAIChatTransportUrl } from './chat-transport';
 
 const buildChatCompletionRequest = (
   input: Parameters<typeof buildAIChatCompletionRequest>[0],
@@ -121,13 +118,5 @@ describe('buildAIChatRegenerateRequest', () => {
         mode: 'regenerate-from-message',
       }),
     ).toBe('/api/v1/conversations/conversation-1/messages/12/regenerate');
-  });
-});
-
-describe('resolveAIChatResumeStreamUrl', () => {
-  it('builds the conversation stream resume path', () => {
-    expect(resolveAIChatResumeStreamUrl('conversation-1')).toBe(
-      '/api/v1/conversations/conversation-1/stream',
-    );
   });
 });

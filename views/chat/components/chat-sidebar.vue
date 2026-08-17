@@ -103,6 +103,11 @@ function selectItem(item: ConversationSidebarItem) {
                   : 'text-foreground hover:bg-accent/55',
               )"
             >
+              <span
+                v-if="item.isGenerating"
+                aria-hidden="true"
+                class="ai-conversation-generating-glow"
+              />
               <button
                 class="min-w-0 flex-1 text-left"
                 :title="item.title"
@@ -156,3 +161,43 @@ function selectItem(item: ConversationSidebarItem) {
     </div>
   </aside>
 </template>
+
+<style scoped>
+.ai-conversation-generating-glow {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+  padding: 1px;
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+}
+
+.ai-conversation-generating-glow::before {
+  position: absolute;
+  inset: -60%;
+  content: '';
+  background: conic-gradient(
+    from 225deg,
+    hsl(var(--primary)) 0deg,
+    hsl(var(--primary) / 0.45) 28deg,
+    transparent 82deg,
+    transparent 360deg
+  );
+  animation: ai-conversation-orbit 2.4s linear infinite;
+}
+
+@keyframes ai-conversation-orbit {
+  to {
+    transform: rotate(1turn);
+  }
+}
+</style>

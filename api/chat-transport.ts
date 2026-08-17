@@ -10,7 +10,3 @@ export function resolveAIChatTransportUrl(request: AIChatTransportRequest) {
     }
   }
 }
-
-export function resolveAIChatResumeStreamUrl(conversationId: string) {
-  return `/api/v1/conversations/${conversationId}/stream`;
-}

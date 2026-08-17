@@ -48,7 +48,7 @@ const conversationClass = computed(() =>
 );
 const contentClass = computed(() =>
   cn(
-    'min-h-full justify-end gap-9 px-3 pb-12 pt-4 sm:px-5 md:pt-6',
+    'min-h-full justify-end gap-9 px-3 pb-8 pt-4 sm:px-5 md:pt-6',
     props.classes?.scroll,
   ),
 );

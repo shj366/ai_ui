@@ -39,7 +39,7 @@ interface UseChatSessionOptions {
   selectedProviderId: Ref<number | undefined>;
   clearTransientMessages: () => void;
   isConversationRequesting?: (conversationId?: string) => boolean;
-  stopStreaming: (conversationId?: string) => void;
+  stopStreaming: (conversationId?: string) => Promise<void> | void;
   transientRequestError: Ref<null | string>;
 }
 
@@ -63,16 +63,29 @@ export function useChatSession(options: UseChatSessionOptions) {
 
   let currentConversationFetchId = 0;
   const messageCache = new Map<string, ChatMessageItem[]>();
+  const conversationDetailCache = new Map<string, AIChatConversationDetail>();
+
+  function normalizeConversationMessages(detail: AIChatConversationDetail) {
+    return mergeAdjacentAssistantMessagesInOrder(
+      detail.messages.map((item, index) =>
+        normalizeMessage(item, index, detail.conversation_id),
+      ),
+    );
+  }
 
   function setActiveConversationKey(value: string) {
     const previousId = activeConversationId.value;
     if (previousId && previousId !== value) {
       messageCache.set(previousId, activeMessages.value);
+      if (activeConversationDetail.value?.conversation_id === previousId) {
+        conversationDetailCache.set(previousId, activeConversationDetail.value);
+      }
     }
     activeConversationId.value = value;
-    if (value && messageCache.has(value)) {
-      activeMessages.value = messageCache.get(value) ?? [];
-    }
+    activeMessages.value = value ? (messageCache.get(value) ?? []) : [];
+    activeConversationDetail.value = value
+      ? conversationDetailCache.get(value)
+      : undefined;
   }
 
   function replaceConversationSummaries(items: AIChatConversationResult[]) {
@@ -97,8 +110,12 @@ export function useChatSession(options: UseChatSessionOptions) {
     const index = items.findIndex(
       (item) => item.conversation_id === summary.conversation_id,
     );
-    if (index >= 0) {
-      items[index] = summary;
+    if (index !== -1) {
+      items[index] = {
+        ...items[index],
+        ...summary,
+        created_time: items[index]?.created_time || summary.created_time,
+      };
       conversationSummaries.value = items;
       return;
     }
@@ -131,8 +148,6 @@ export function useChatSession(options: UseChatSessionOptions) {
   function createNewConversation() {
     currentConversationFetchId++;
     setActiveConversationKey('');
-    activeConversationDetail.value = undefined;
-    activeMessages.value = [];
     options.draftConversationTitle.value = '新话题';
     detailLoading.value = false;
     options.resetComposerState(true);
@@ -145,6 +160,7 @@ export function useChatSession(options: UseChatSessionOptions) {
       conversation_id: detail.conversation_id,
       created_time: detail.created_time,
       id: detail.id,
+      is_generating: detail.is_generating,
       is_pinned: detail.is_pinned,
       title: detail.title,
       updated_time: detail.updated_time,
@@ -188,7 +204,8 @@ export function useChatSession(options: UseChatSessionOptions) {
         message_index: persistedMessage.message_index ?? message.message_index,
         message_type: persistedMessage.message_type ?? message.message_type,
         model_id: persistedMessage.model_id ?? message.model_id ?? null,
-        provider_id: persistedMessage.provider_id ?? message.provider_id ?? null,
+        provider_id:
+          persistedMessage.provider_id ?? message.provider_id ?? null,
       };
     });
   }
@@ -230,9 +247,11 @@ export function useChatSession(options: UseChatSessionOptions) {
   async function syncConversationDetailMetadata(conversationId: string) {
     const fetchId = currentConversationFetchId;
     const detail = await getAIChatConversationDetailApi(conversationId);
+    const persistedMessages = normalizeConversationMessages(detail);
 
     syncConversationSummaryFromDetail(detail);
-    await fetchConversations(false, true);
+    conversationDetailCache.set(conversationId, detail);
+    messageCache.set(conversationId, persistedMessages);
 
     if (
       fetchId !== currentConversationFetchId ||
@@ -243,6 +262,7 @@ export function useChatSession(options: UseChatSessionOptions) {
 
     syncActiveMessageMetadataFromDetail(detail);
     activeConversationDetail.value = detail;
+    messageCache.set(conversationId, activeMessages.value);
     options.transientRequestError.value = null;
     options.selectedProviderId.value = detail.provider_id;
     options.selectedModelId.value = detail.model_id;
@@ -265,6 +285,11 @@ export function useChatSession(options: UseChatSessionOptions) {
 
     try {
       const detail = await getAIChatConversationDetailApi(conversationId);
+      const messages = normalizeConversationMessages(detail);
+
+      syncConversationSummaryFromDetail(detail);
+      conversationDetailCache.set(conversationId, detail);
+      messageCache.set(conversationId, messages);
 
       if (
         fetchId !== currentConversationFetchId ||
@@ -273,13 +298,8 @@ export function useChatSession(options: UseChatSessionOptions) {
         return;
       }
 
-      syncConversationSummaryFromDetail(detail);
       activeConversationDetail.value = detail;
-      activeMessages.value = mergeAdjacentAssistantMessagesInOrder(
-        detail.messages.map((item, index) =>
-          normalizeMessage(item, index, conversationId),
-        ),
-      );
+      activeMessages.value = messages;
       if (clearTransientMessages) {
         options.clearTransientMessages();
       }
@@ -315,11 +335,20 @@ export function useChatSession(options: UseChatSessionOptions) {
 
     options.resetComposerState(true);
     setActiveConversationKey(conversationId);
+    options.autoFollowMessageScroll.value = true;
+    if (activeMessages.value.length > 0) {
+      options.scrollToBottom(true);
+    }
     if (options.isConversationRequesting?.(conversationId)) {
       return;
     }
-    activeConversationDetail.value = undefined;
-    await loadConversationDetail(conversationId);
+    const hasCachedContent = Boolean(
+      activeMessages.value.length > 0 || activeConversationDetail.value,
+    );
+    await loadConversationDetail(conversationId, {
+      showLoading: !hasCachedContent,
+      scrollToBottom: true,
+    });
   }
 
   async function loadMoreConversations() {
@@ -359,8 +388,10 @@ export function useChatSession(options: UseChatSessionOptions) {
   }
 
   async function removeConversation(conversationId: string) {
-    options.stopStreaming(conversationId);
+    await options.stopStreaming(conversationId);
     await deleteAIChatConversationApi(conversationId);
+    conversationDetailCache.delete(conversationId);
+    messageCache.delete(conversationId);
     removeConversationSummary(conversationId);
     await closeRenameModalIfMatched(conversationId);
 
@@ -392,7 +423,7 @@ export function useChatSession(options: UseChatSessionOptions) {
   }
 
   async function clearMessages() {
-    options.stopStreaming(activeConversationId.value);
+    await options.stopStreaming(activeConversationId.value);
     const conversation = activeConversation.value;
     const conversationId = activeConversationId.value;
 
@@ -403,16 +434,22 @@ export function useChatSession(options: UseChatSessionOptions) {
 
     await clearAIChatConversationMessagesApi(conversationId);
     activeMessages.value = [];
+    messageCache.set(conversationId, []);
     if (activeConversationDetail.value) {
       activeConversationDetail.value = {
         ...activeConversationDetail.value,
         message_count: 0,
         messages: [],
       };
+      conversationDetailCache.set(
+        conversationId,
+        activeConversationDetail.value,
+      );
     }
     if (conversation) {
       upsertConversationSummary({
         ...conversation,
+        is_generating: false,
         updated_time: new Date().toISOString(),
       });
     }
@@ -441,12 +478,13 @@ export function useChatSession(options: UseChatSessionOptions) {
       return;
     }
 
-    options.stopStreaming(currentConversationId);
+    await options.stopStreaming(currentConversationId);
 
     await deleteAIChatMessageApi(currentConversationId, item.message_id);
     activeMessages.value = activeMessages.value.filter(
       (message) => message.id !== item.id,
     );
+    messageCache.set(currentConversationId, activeMessages.value);
 
     if (activeConversationDetail.value) {
       activeConversationDetail.value = {
@@ -461,6 +499,10 @@ export function useChatSession(options: UseChatSessionOptions) {
         ),
         updated_time: new Date().toISOString(),
       };
+      conversationDetailCache.set(
+        currentConversationId,
+        activeConversationDetail.value,
+      );
     }
 
     const conversation = activeConversation.value;

@@ -151,10 +151,6 @@ export function useChatScroll(options: UseChatScrollOptions = {}) {
     return getBottomDistance(container) <= 2;
   }
 
-  function getBottomSentinel(container: HTMLElement) {
-    return container.querySelector<HTMLElement>('[data-chat-bottom-sentinel]');
-  }
-
   function getMessageElements(container: HTMLElement) {
     return [
       ...container.querySelectorAll<HTMLElement>('[data-chat-message-key]'),
@@ -256,18 +252,9 @@ export function useChatScroll(options: UseChatScrollOptions = {}) {
     scrollKey = getCurrentScrollKey(),
   ) {
     programmaticScrollUntil = performance.now() + PROGRAMMATIC_SCROLL_LOCK_MS;
-    const bottomSentinel = getBottomSentinel(container);
     const previousScrollBehavior = container.style.scrollBehavior;
     container.style.scrollBehavior = 'auto';
-
-    if (bottomSentinel && !options.reverse) {
-      bottomSentinel.scrollIntoView({
-        block: 'end',
-        inline: 'nearest',
-      });
-    } else {
-      container.scrollTop = options.reverse ? 0 : container.scrollHeight;
-    }
+    container.scrollTop = options.reverse ? 0 : container.scrollHeight;
     container.style.scrollBehavior = previousScrollBehavior;
     updateLastScrollTop();
     updateScrollableState();

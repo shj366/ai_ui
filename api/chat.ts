@@ -83,6 +83,7 @@ export interface AIChatConversationResult {
   conversation_id: string;
   created_time: string;
   id: number;
+  is_generating?: boolean;
   is_pinned: boolean;
   title: string;
   updated_time?: null | string;
@@ -432,8 +433,6 @@ export async function stopAIChatConversationApi(conversationId: string) {
     `/api/v1/conversations/${conversationId}/stop`,
   );
 }
-
-export { resolveAIChatResumeStreamUrl } from './chat-transport';
 
 export async function deleteAIChatMessageApi(
   conversationId: string,

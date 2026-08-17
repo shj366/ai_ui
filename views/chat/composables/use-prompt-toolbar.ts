@@ -482,7 +482,7 @@ export function usePromptToolbar(options: UsePromptToolbarOptions) {
       { class: 'flex w-[280px] flex-col gap-1 rounded-2xl p-1' },
       [
         renderAdvancedMenuItem({
-          disabled: sending.value || !canCreateNewConversation.value,
+          disabled: !canCreateNewConversation.value,
           icon: 'mdi:message-plus-outline',
           label: '新建对话',
           onClick: createNewConversation,
@@ -617,7 +617,7 @@ export function usePromptToolbar(options: UsePromptToolbarOptions) {
           },
           [
             renderFooterIconButton({
-              disabled: sending.value || !canCreateNewConversation.value,
+              disabled: !canCreateNewConversation.value,
               icon: 'mdi:message-plus-outline',
               label: '新对话',
               onClick: createNewConversation,

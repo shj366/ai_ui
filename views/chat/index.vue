@@ -81,27 +81,23 @@ import { normalizeAIModelOptions } from './model-options';
 
 const { isDark } = usePreferences();
 const prompt = ref('');
+const promptDrafts = ref<Record<string, string>>({});
 const draftConversationTitle = ref('新话题');
 const selectedProviderId = ref<number>();
 const selectedModelId = ref<string>();
 const editingMessage = ref<ChatMessageItem>();
 const regeneratingMessageIndex = ref<number>();
-const transientPlacement = ref<{
+interface TransientPlacement {
   insertIndex: number;
   replaceMessageIds: string[];
-}>();
+}
+
+const transientPlacements = ref<Record<string, TransientPlacement>>({});
 const messageListViewportVersion = ref(0);
 const messageListScrollKey = ref('draft');
 
 const providers = ref<AIProviderModelOptionResult[]>([]);
 const models = ref<AIModelResult[]>([]);
-const selectedModel = computed(() =>
-  models.value.find(
-    (item) =>
-      item.provider_id === selectedProviderId.value &&
-      item.model_id === selectedModelId.value,
-  ),
-);
 
 const resourcesLoading = ref(false);
 
@@ -119,35 +115,87 @@ const {
 
 const {
   abort: abortTransientRequest,
-  abortAllLocal,
+  detachAll,
   isConversationRequesting,
   isRequesting,
   messages: transientMessagesState,
   onRequest: onTransientRequest,
-  resumeActiveStream,
   setMessages: setTransientMessages,
   setViewedConversationId,
   transientRequestError,
 } = useAIChatStream();
-const sending = computed(() => isRequesting.value);
+const stoppingConversationIds = ref<Set<string>>(new Set());
 
-function resetComposerState(clearPrompt = false) {
+function isConversationBusy(conversationId?: string) {
+  if (!conversationId) {
+    return isConversationRequesting(conversationId);
+  }
+  return (
+    isConversationRequesting(conversationId) ||
+    stoppingConversationIds.value.has(conversationId)
+  );
+}
+
+function getComposerDraftKey(conversationId?: string) {
+  return conversationId || 'draft';
+}
+
+function writePromptDraft(conversationId: string | undefined, value: string) {
+  const key = getComposerDraftKey(conversationId);
+  if (!value) {
+    if (!(key in promptDrafts.value)) {
+      return;
+    }
+    const nextDrafts = { ...promptDrafts.value };
+    delete nextDrafts[key];
+    promptDrafts.value = nextDrafts;
+    return;
+  }
+  promptDrafts.value = {
+    ...promptDrafts.value,
+    [key]: value,
+  };
+}
+
+function restorePromptDraft(conversationId?: string) {
+  prompt.value = promptDrafts.value[getComposerDraftKey(conversationId)] ?? '';
+}
+
+function resetComposerState(_clearPrompt = false) {
   editingMessage.value = undefined;
   regeneratingMessageIndex.value = undefined;
-  transientPlacement.value = undefined;
-  if (clearPrompt) {
-    prompt.value = '';
-  }
 }
 
 const stopTargetConversationId = ref('');
 
-function stopStreaming(conversationId?: string) {
-  const targetId = conversationId || stopTargetConversationId.value;
-  abortTransientRequest(targetId);
-  if (targetId) {
-    void stopAIChatConversationApi(targetId).catch(() => undefined);
+function setConversationStopping(conversationId: string, stopping: boolean) {
+  const nextIds = new Set(stoppingConversationIds.value);
+  if (stopping) {
+    nextIds.add(conversationId);
+  } else {
+    nextIds.delete(conversationId);
   }
+  stoppingConversationIds.value = nextIds;
+}
+
+async function stopStreaming(conversationId?: string) {
+  const targetId = conversationId || stopTargetConversationId.value;
+  if (!targetId || stoppingConversationIds.value.has(targetId)) {
+    return;
+  }
+  abortTransientRequest(targetId);
+  setConversationStopping(targetId, true);
+  try {
+    await stopAIChatConversationApi(targetId);
+  } finally {
+    setConversationStopping(targetId, false);
+  }
+}
+
+function handleStopStreaming() {
+  void stopStreaming().catch((error) => {
+    message.error((error as Error).message);
+  });
 }
 
 function resetMessageListViewport() {
@@ -166,7 +214,6 @@ const {
   createNewConversation,
   deleteMessageChain,
   detailLoading,
-  fetchConversations,
   hasMoreConversations,
   initializeSession,
   loadConversationDetail,
@@ -187,7 +234,7 @@ const {
     message.success(content);
   },
   renameConversationFormData,
-  isConversationRequesting,
+  isConversationRequesting: isConversationBusy,
   resetComposerState,
   resetMessageListViewport,
   clearTransientMessages: () => {
@@ -201,9 +248,19 @@ const {
   transientRequestError,
 });
 
+const sending = computed(
+  () =>
+    isRequesting.value ||
+    stoppingConversationIds.value.has(activeConversationId.value),
+);
+
 watch(
   activeConversationId,
-  (conversationId) => {
+  (conversationId, previousId) => {
+    if (previousId !== undefined && previousId !== conversationId) {
+      writePromptDraft(previousId, prompt.value);
+    }
+    restorePromptDraft(conversationId);
     messageListScrollKey.value = conversationId || 'draft';
     stopTargetConversationId.value = conversationId;
     setViewedConversationId(conversationId);
@@ -211,42 +268,48 @@ watch(
   { immediate: true, flush: 'sync' },
 );
 
+const activeTransientPlacement = computed(
+  () => transientPlacements.value[activeConversationId.value],
+);
+
+function setTransientPlacement(
+  conversationId: string,
+  placement?: TransientPlacement,
+) {
+  const nextPlacements = { ...transientPlacements.value };
+  if (placement) {
+    nextPlacements[conversationId] = placement;
+  } else {
+    transientPlacements.value = Object.fromEntries(
+      Object.entries(nextPlacements).filter(([key]) => key !== conversationId),
+    );
+    return;
+  }
+  transientPlacements.value = nextPlacements;
+}
+
 let generatingPollTimer: ReturnType<typeof setInterval> | undefined;
 
-watch(
-  [activeConversationId, activeConversationDetail, isRequesting],
-  () => {
-    if (generatingPollTimer) {
-      clearInterval(generatingPollTimer);
-      generatingPollTimer = undefined;
-    }
-    const conversationId = activeConversationId.value;
-    if (
-      !conversationId ||
-      isConversationRequesting(conversationId) ||
-      !activeConversationDetail.value?.is_generating
-    ) {
-      return;
-    }
-    const lastAssistantIndex = activeMessages.value.findLastIndex(
-      (item) => item.role === 'assistant',
-    );
-    const lastAssistant = activeMessages.value[lastAssistantIndex];
-    if (lastAssistant) {
-      transientPlacement.value = {
-        insertIndex: lastAssistantIndex,
-        replaceMessageIds: [lastAssistant.id],
-      };
-    }
-    void resumeActiveStream(conversationId);
-    generatingPollTimer = setInterval(() => {
-      void loadConversationDetail(conversationId, {
-        scrollToBottom: false,
-        showLoading: false,
-      });
-    }, 1500);
-  },
-);
+watch([activeConversationId, activeConversationDetail, sending], () => {
+  if (generatingPollTimer) {
+    clearInterval(generatingPollTimer);
+    generatingPollTimer = undefined;
+  }
+  const conversationId = activeConversationId.value;
+  if (
+    !conversationId ||
+    isConversationBusy(conversationId) ||
+    !activeConversationDetail.value?.is_generating
+  ) {
+    return;
+  }
+  generatingPollTimer = setInterval(() => {
+    void loadConversationDetail(conversationId, {
+      scrollToBottom: false,
+      showLoading: false,
+    });
+  }, 2000);
+});
 
 // Chat settings needs refs from useChatSession for its watchers
 const {
@@ -590,7 +653,7 @@ async function submitChat(
   overridePromptText?: string,
   attachments: AIChatComposerAttachment[] = [],
 ) {
-  if (sending.value) {
+  if (isConversationBusy(activeConversationId.value)) {
     return false;
   }
 
@@ -695,12 +758,13 @@ async function submitChat(
     return false;
   }
 
+  const sourceConversationId = activeConversationId.value;
   const targetConversationId =
-    activeConversationId.value || crypto.randomUUID();
+    sourceConversationId || crypto.randomUUID();
   const existingSummary = conversationSummaries.value.find(
     (item) => item.conversation_id === targetConversationId,
   );
-  if (!activeConversationId.value) {
+  if (!sourceConversationId) {
     setActiveConversationKey(targetConversationId);
     draftConversationTitle.value = submittedTitle;
   }
@@ -708,6 +772,7 @@ async function submitChat(
     conversation_id: targetConversationId,
     created_time: existingSummary?.created_time ?? new Date().toISOString(),
     id: existingSummary?.id ?? Date.now(),
+    is_generating: true,
     is_pinned: existingSummary?.is_pinned ?? false,
     title: existingSummary?.title || submittedTitle,
     updated_time: new Date().toISOString(),
@@ -726,10 +791,11 @@ async function submitChat(
 
   autoFollowMessageScroll.value = true;
   transientRequestError.value = null;
-  transientPlacement.value = nextTransientPlacement;
+  setTransientPlacement(targetConversationId, nextTransientPlacement);
   setTransientMessages([]);
 
   if (regenerateMessageId === undefined) {
+    writePromptDraft(sourceConversationId, '');
     prompt.value = '';
   }
 
@@ -766,43 +832,63 @@ async function submitChat(
           mode: 'regenerate-from-message',
         };
 
-  await onTransientRequest(requestParams);
+  void finalizeChatRequest({
+    editingMessageIndex,
+    regenerateMessageId,
+    requestConversationId: targetConversationId,
+    requestPromise: onTransientRequest(requestParams),
+    submittedPromptText,
+  });
+  return true;
+}
 
-  const requestConversationId = targetConversationId;
-  const stillViewing = activeConversationId.value === requestConversationId;
+async function finalizeChatRequest(params: {
+  editingMessageIndex?: number;
+  regenerateMessageId?: number;
+  requestConversationId: string;
+  requestPromise: Promise<'completed' | 'detached' | 'failed' | 'ignored'>;
+  submittedPromptText: string;
+}) {
+  const requestOutcome = await params.requestPromise;
+  const stillViewing =
+    activeConversationId.value === params.requestConversationId;
   const requestError = stillViewing ? transientRequestError.value : null;
 
   if (requestError) {
     message.error(requestError);
     if (
-      regenerateMessageId === undefined &&
-      editingMessageIndex === undefined &&
-      stillViewing
+      params.regenerateMessageId === undefined &&
+      params.editingMessageIndex === undefined
     ) {
-      prompt.value = submittedPromptText;
-    }
-  }
-
-  if (requestConversationId) {
-    rememberConversationSessionConfig(requestConversationId);
-    if (stillViewing) {
-      if (!requestError) {
-        commitSuccessfulTransientMessages();
+      writePromptDraft(params.requestConversationId, params.submittedPromptText);
+      if (stillViewing) {
+        prompt.value = params.submittedPromptText;
       }
-      setTransientMessages([]);
-      await syncCompletedConversationMetadata(requestConversationId);
-    } else {
-      void syncCompletedConversationMetadata(requestConversationId);
     }
   }
 
+  rememberConversationSessionConfig(params.requestConversationId);
+  const currentSummary = conversationSummaries.value.find(
+    (item) => item.conversation_id === params.requestConversationId,
+  );
+  if (currentSummary) {
+    upsertConversationSummary({
+      ...currentSummary,
+      is_generating: isConversationBusy(params.requestConversationId),
+    });
+  }
   if (stillViewing) {
+    if (requestOutcome === 'completed' && !requestError) {
+      commitSuccessfulTransientMessages();
+    }
+    setTransientMessages([]);
+    await syncCompletedConversationMetadata(params.requestConversationId);
     editingMessage.value = undefined;
     regeneratingMessageIndex.value = undefined;
-    transientPlacement.value = undefined;
+  } else {
+    void syncCompletedConversationMetadata(params.requestConversationId);
   }
-
-  return !requestError;
+  setTransientPlacement(params.requestConversationId, undefined);
 }
 
 const transientMessages = computed<ChatMessageItem[]>(() => {
@@ -863,7 +949,7 @@ function commitSuccessfulTransientMessages() {
     return;
   }
 
-  const placement = transientPlacement.value;
+  const placement = activeTransientPlacement.value;
   if (!placement) {
     activeMessages.value = [...activeMessages.value, ...committedMessages];
     return;
@@ -903,7 +989,7 @@ const displayMessages = computed<ChatMessageItem[]>(() => {
   const renderableTransientMessages = transientMessages.value.filter(
     (message) => shouldRenderChatMessage(message),
   );
-  const placement = transientPlacement.value;
+  const placement = activeTransientPlacement.value;
 
   if (!placement || renderableTransientMessages.length === 0) {
     return [...activeMessages.value, ...renderableTransientMessages].filter(
@@ -937,7 +1023,7 @@ const messageListRestoring = computed(
   () => displayMessages.value.length > 0 && !isScrollRestored.value,
 );
 const messageAreaLoading = computed(
-  () => detailLoading.value || messageListRestoring.value,
+  () => detailLoading.value && displayMessages.value.length === 0,
 );
 const messageListClass = computed(() =>
   ['h-full min-h-0 max-h-full', messageListRestoring.value ? 'invisible' : '']
@@ -1045,15 +1131,24 @@ const canClearMessages = computed(() => {
 });
 
 const canCreateNewConversation = computed(() => {
-  return activeMessages.value.length > 0;
+  return Boolean(
+    activeConversationId.value ||
+      activeMessages.value.length > 0 ||
+      transientMessages.value.length > 0,
+  );
 });
 
 const conversationItems = computed<ConversationSidebarItem[]>(() =>
-  buildConversationSidebarItems(conversationSummaries.value),
+  buildConversationSidebarItems(
+    conversationSummaries.value.map((item) => ({
+      ...item,
+      is_generating: isConversationBusy(item.conversation_id),
+    })),
+  ),
 );
 
 const conversationCreation = computed<ConversationSidebarCreation>(() => ({
-  disabled: sending.value || !canCreateNewConversation.value,
+  disabled: !canCreateNewConversation.value,
   onClick: createNewConversation,
 }));
 
@@ -1219,7 +1314,7 @@ onBeforeUnmount(() => {
   if (generatingPollTimer) {
     clearInterval(generatingPollTimer);
   }
-  abortAllLocal();
+  detachAll();
 });
 </script>
 
@@ -1323,7 +1418,7 @@ onBeforeUnmount(() => {
         :footer="renderPromptInputFooter"
         :loading="sending"
         name="chat-message"
-        :on-cancel="stopStreaming"
+        :on-cancel="handleStopStreaming"
         :on-change="handlePromptInputChange"
         :on-submit="handlePromptInputSubmit"
         placeholder="在这里输入消息，Enter 发送，Shift + Enter 换行"
