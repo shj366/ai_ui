@@ -1430,6 +1430,19 @@ export function renderChatMessageContent(
   }
 
   const children: VNodeChild[] = [];
+  const processPlan = createMessageProcessFoldPlan(
+    message,
+    shouldShowEventBlock,
+  );
+  if (processPlan) {
+    children.push(
+      renderProcessFold(message, processPlan, MarkdownContent, {
+        isThinkingExpanded: () => false,
+        setThinkingExpanded: () => {},
+      }),
+    );
+  }
+
   let fileRenderIndex = 0;
   message.blocks.forEach((block, index) => {
     if (block.type === 'file') {
