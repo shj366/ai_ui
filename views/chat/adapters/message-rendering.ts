@@ -89,6 +89,11 @@ import {
   type MessageProcessFoldPlan,
 } from './message-process-fold';
 
+void collectSourceItems;
+void renderInlineSourcePanel;
+void renderProcessFold;
+void createMessageProcessFoldPlan;
+
 export interface CreateChatMessageListRoleOptions {
   canResendLastUserMessage: (message: ChatMessageItem) => boolean;
   isDark: boolean;
@@ -1381,18 +1386,13 @@ export function hasRenderableChatMessage(message: ChatMessageItem) {
 
   return Boolean(
     getMessageTextContent(message, 'text').trim() ||
-    getMessageTextContent(message, 'reasoning').trim() ||
-    getMessageFileBlocks(message).length > 0 ||
-    getVisibleMessageEvents(message).length > 0,
+    getMessageFileBlocks(message).length > 0,
   );
 }
 
 export function renderChatMessageContent(
   message: ChatMessageItem,
-  options: Pick<
-    CreateChatMessageListRoleOptions,
-    'isDark' | 'isThinkingExpanded' | 'setThinkingExpanded'
-  >,
+  options: Pick<CreateChatMessageListRoleOptions, 'isDark'>,
 ): VNodeChild {
   const MarkdownContent = createMarkdownContentRenderer(options.isDark);
   const markdownStreaming = createAIReplyMarkdownStreaming(message);
@@ -1402,143 +1402,47 @@ export function renderChatMessageContent(
     return renderErrorMessageContent(text, MarkdownContent, markdownStreaming);
   }
 
-  const allEvents = getMessageEventBlocks(message);
-  const sourceItems = collectSourceItems(allEvents);
-  const processFoldPlan = createMessageProcessFoldPlan(
-    message,
-    shouldShowEventBlock,
-  );
-  const foldedBlockIndexes = new Set(processFoldPlan?.blockIndexes ?? []);
   const children: VNodeChild[] = [];
-  let eventRun: AIChatEventMessageBlock[] = [];
-  let fileRun: AIChatFileMessageBlock[] = [];
   let fileRenderIndex = 0;
-
-  const flushEventRun = () => {
-    if (eventRun.length === 0) {
+  message.blocks.forEach((block, index) => {
+    if (block.type === 'file') {
+      const filesNode = renderMessageFiles(message, [block], {
+        key: `${message.id}-file-${index}`,
+        startIndex: fileRenderIndex,
+      });
+      fileRenderIndex += 1;
+      if (filesNode) children.push(filesNode);
       return;
     }
-
-    const eventsNode = renderMessageEvents(eventRun, MarkdownContent);
-    if (eventsNode) {
-      children.push(eventsNode);
-    }
-    eventRun = [];
-  };
-
-  const flushFileRun = () => {
-    if (fileRun.length === 0) {
+    if (block.type !== 'text' || !block.text.trim()) {
       return;
     }
-
-    const filesNode = renderMessageFiles(message, fileRun, {
-      key: `files-${children.length}`,
-      startIndex: fileRenderIndex,
-    });
-    fileRenderIndex += fileRun.length;
-    if (filesNode) {
-      children.push(filesNode);
-    }
-    fileRun = [];
-  };
-
-  const renderTextBlock = (content: string, index: number) => {
     const inlineExtraction = extractMarkdownInlineFiles(
-      content,
+      block.text,
       `${message.id}-text-${index}`,
     );
-
     if (inlineExtraction.content.trim()) {
       children.push(
         h(MarkdownContent, {
           key: `${message.id}-markdown-${index}`,
           content: inlineExtraction.content,
-          sourceItems,
           streaming: markdownStreaming,
         }),
       );
     }
-
     if (inlineExtraction.files.length > 0) {
       const filesNode = renderMessageFiles(message, inlineExtraction.files, {
         key: `${inlineExtraction.key}-files`,
         startIndex: fileRenderIndex,
       });
       fileRenderIndex += inlineExtraction.files.length;
-      if (filesNode) {
-        children.push(filesNode);
-      }
+      if (filesNode) children.push(filesNode);
     }
-  };
-
-  const processFoldStartIndex = processFoldPlan?.blockIndexes[0];
-
-  message.blocks.forEach((block, index) => {
-    if (processFoldPlan && processFoldStartIndex === index) {
-      flushEventRun();
-      flushFileRun();
-      children.push(
-        renderProcessFold(message, processFoldPlan, MarkdownContent, options),
-      );
-    }
-
-    if (foldedBlockIndexes.has(index)) {
-      return;
-    }
-
-    if (block.type === 'event') {
-      flushFileRun();
-      if (shouldShowEventBlock(message, block)) {
-        eventRun.push(block);
-      }
-      return;
-    }
-
-    flushEventRun();
-
-    if (block.type === 'file') {
-      fileRun.push(block);
-      return;
-    }
-
-    flushFileRun();
-
-    if (block.type === 'reasoning') {
-      if (block.text.trim()) {
-        children.push(
-          renderReasoningBlock(
-            message,
-            block.text,
-            `reasoning-${index}`,
-            options,
-          ),
-        );
-      }
-      return;
-    }
-
-    renderTextBlock(block.text, index);
   });
 
-  flushEventRun();
-  flushFileRun();
-
-  const sourcesNode = renderInlineSourcePanel(sourceItems);
-  if (sourcesNode) {
-    children.push(
-      h('div', { key: `${message.id}-sources`, class: 'min-w-0 max-w-full' }, [
-        sourcesNode,
-      ]),
-    );
-  }
-
-  if (children.length === 0 && message.streaming) {
-    return null;
-  }
-
+  if (children.length === 0 && message.streaming) return null;
   return h('div', { class: 'min-w-0 max-w-full space-y-3' }, children);
 }
-
 function renderMessageHeader(
   message: ChatMessageItem,
   options: Pick<

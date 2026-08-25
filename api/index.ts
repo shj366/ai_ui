@@ -1,5 +1,3 @@
-import type { Recordable } from '@vben/types';
-
 import type { AIActionResult } from './chat';
 
 import type { PaginationResult } from '#/types';
@@ -11,7 +9,6 @@ import { readOptionalDefaultModelResponse } from './response';
 
 export type AIProviderType = 0 | 1 | 2 | 3 | 4 | 5;
 export type AIStatusType = 0 | 1;
-export type AIMcpType = 0 | 1 | 2;
 
 interface AIProviderQueryParams {
   cursor?: null | string;
@@ -105,49 +102,6 @@ export interface AIDefaultModelResult extends AIDefaultModelParams {
   scene: 'assistant';
   provider_name: string;
   provider_type: AIProviderType;
-  created_time: string;
-  updated_time?: null | string;
-}
-
-export interface AIConfigParams {
-  id: number;
-  name: string;
-  type?: null | string;
-  key: string;
-  value: string;
-  is_frontend: boolean;
-  remark?: null | string;
-}
-
-export interface AIConfigResult extends AIConfigParams {
-  created_time: string;
-  updated_time?: null | string;
-}
-
-export interface AIMcpQueryParams {
-  name?: null | string;
-  page?: number;
-  size?: number;
-  type?: AIMcpType | null;
-}
-
-export interface AIMcpParams {
-  name: string;
-  type?: AIMcpType;
-  description?: null | string;
-  url?: null | string;
-  headers?: null | Recordable<unknown>;
-  command?: null | string;
-  args?: null | string[];
-  env?: null | Recordable<unknown>;
-  timeout?: number;
-  read_timeout?: number;
-  tool_prefix?: null | string;
-  include_instructions?: boolean;
-}
-
-export interface AIMcpResult extends AIMcpParams {
-  id: number;
   created_time: string;
   updated_time?: null | string;
 }
@@ -279,42 +233,6 @@ export async function updateAIAssistantDefaultModelApi(
   );
 }
 
-export async function getAllAIConfigApi() {
-  return requestClient.get<AIConfigResult[]>('/api/v1/sys/configs/all', {
-    params: { type: 'AI' },
-  });
-}
-
-export async function updateAIConfigApi(data: AIConfigParams[]) {
-  return requestClient.put<AIActionResult>('/api/v1/sys/configs', data);
-}
-
-export async function getAIMcpDetailApi(pk: number) {
-  return requestClient.get<AIMcpResult>(`/api/v1/mcps/${pk}`);
-}
-
-export async function getAIMcpListApi(params?: AIMcpQueryParams) {
-  return requestClient.get<PaginationResult<AIMcpResult>>('/api/v1/mcps', {
-    params,
-  });
-}
-
-export async function getAllAIMcpApi() {
-  return requestClient.get<AIMcpResult[]>('/api/v1/mcps/all');
-}
-
-export async function createAIMcpApi(data: AIMcpParams) {
-  return requestClient.post<AIActionResult>('/api/v1/mcps', data);
-}
-
-export async function updateAIMcpApi(pk: number, data: AIMcpParams) {
-  return requestClient.put<AIActionResult>(`/api/v1/mcps/${pk}`, data);
-}
-
-export async function deleteAIMcpApi(pk: number) {
-  return requestClient.delete<AIActionResult>(`/api/v1/mcps/${pk}`);
-}
-
 export async function getAllAIQuickPhraseApi() {
   return requestClient.get<AIQuickPhraseResult[]>('/api/v1/quick-phrases/all');
 }
@@ -328,9 +246,7 @@ export async function getAIQuickPhraseListApi(
 ) {
   return requestClient.get<PaginationResult<AIQuickPhraseResult>>(
     '/api/v1/quick-phrases',
-    {
-      params,
-    },
+    { params },
   );
 }
 

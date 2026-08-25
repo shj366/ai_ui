@@ -54,7 +54,6 @@ import {
   getMessageTextContent,
   makeConversationTitle,
   mergeStreamMessage,
-  parseJsonField,
   replaceMessageTextBlocks,
 } from '../../runtime/message';
 import { useAIChatStream } from '../../runtime/use-chat-stream';
@@ -70,13 +69,11 @@ import {
 import { ChatConversationList } from './components';
 import ChatModelSelector from './components/chat-model-selector.vue';
 import ChatPromptInput from './components/chat-prompt-input.vue';
-import ChatSettingsPanel from './components/chat-settings-panel.vue';
 import ChatSidebar from './components/chat-sidebar.vue';
 import { useChatScroll } from './composables/use-chat-scroll';
 import { useChatSession } from './composables/use-chat-session';
 import { useChatSettings } from './composables/use-chat-settings';
 import { usePromptToolbar } from './composables/use-prompt-toolbar';
-import { useThinkingPanel } from './composables/use-thinking-panel';
 import { normalizeAIModelOptions } from './model-options';
 
 const { isDark } = usePreferences();
@@ -311,46 +308,7 @@ watch([activeConversationId, activeConversationDetail, sending], () => {
   }, 2000);
 });
 
-// Chat settings needs refs from useChatSession for its watchers
-const {
-  GENERATION_TYPE_OPTIONS,
-  THINKING_OPTIONS,
-  WEB_SEARCH_OPTIONS,
-  enableBuiltinTools,
-  enableCodeExecution,
-  enableWebFetch,
-  frequencyPenalty,
-  generationType,
-  generationTypeButtonLabel,
-  hasAdvancedSettings,
-  imageAction,
-  imageAspectRatio,
-  imageBackground,
-  imageInputFidelity,
-  imageModel,
-  imageModeration,
-  imageOutputCompression,
-  imageOutputFormat,
-  imagePartialImages,
-  imageQuality,
-  imageSize,
-  logitBias,
-  maxTokens,
-  parallelToolCalls,
-  presencePenalty,
-  rememberConversationSessionConfig,
-  resetModelSettings,
-  seed,
-  selectedMcpIds,
-  stopSequences,
-  temperature,
-  thinking,
-  thinkingButtonLabel,
-  timeout,
-  topP,
-  webSearch,
-  webSearchButtonLabel,
-} = useChatSettings({
+const { rememberConversationSessionConfig } = useChatSettings({
   activeConversationDetail,
   activeConversationId,
   selectedModelId,
@@ -703,47 +661,9 @@ async function submitChat(
   try {
     payload = {
       conversation_id: activeConversationId.value,
-      enable_builtin_tools: enableBuiltinTools.value,
-      enable_code_execution: enableCodeExecution.value,
-      enable_web_fetch: enableWebFetch.value,
-      frequency_penalty: frequencyPenalty.value,
-      image_action: imageAction.value,
-      image_aspect_ratio: imageAspectRatio.value,
-      image_background: imageBackground.value,
-      image_input_fidelity: imageInputFidelity.value,
-      image_model: imageModel.value.trim() || undefined,
-      image_moderation: imageModeration.value,
-      image_output_compression: imageOutputCompression.value,
-      image_output_format: imageOutputFormat.value,
-      image_partial_images: imagePartialImages.value,
-      image_quality: imageQuality.value,
-      image_size: imageSize.value,
-      logit_bias: parseJsonField<Record<string, number>>(
-        logitBias.value,
-        'Logit Bias',
-        (value) =>
-          value !== null && typeof value === 'object' && !Array.isArray(value),
-      ),
-      max_tokens: maxTokens.value,
-      mcp_ids:
-        selectedMcpIds.value.length > 0 ? selectedMcpIds.value : undefined,
-      generation_type: generationType.value,
       model_id: selectedModelId.value,
-      parallel_tool_calls: parallelToolCalls.value,
-      presence_penalty: presencePenalty.value,
       provider_id: selectedProviderId.value,
       mode: chatMode,
-      thinking: thinking.value,
-      seed: seed.value,
-      stop_sequences: parseJsonField<string[]>(
-        stopSequences.value,
-        '停止序列',
-        Array.isArray,
-      ),
-      temperature: temperature.value,
-      timeout: timeout.value,
-      top_p: topP.value,
-      web_search: webSearch.value,
       ...(chatMode === 'edit' && hasEditingMessageId
         ? {
             edit_message_id: editingMessageId,
@@ -1039,9 +959,8 @@ watch(
   { flush: 'post' },
 );
 
-const { isThinkingExpanded, setThinkingExpanded } = useThinkingPanel({
-  displayMessages,
-});
+const isThinkingExpanded = () => false;
+const setThinkingExpanded = () => {};
 
 const messageListItems = computed(() => {
   const items: import('./components').ChatMessageListProps['items'] = [];
@@ -1052,11 +971,9 @@ const messageListItems = computed(() => {
     items.push({
       content: isEditing
         ? getMessageTextContent(message)
-        : renderChatMessageContent(message, {
-            isDark: isDark.value,
-            isThinkingExpanded,
-            setThinkingExpanded,
-          }),
+          : renderChatMessageContent(message, {
+              isDark: isDark.value,
+            }),
       extraInfo: {
         message,
       },
@@ -1211,7 +1128,6 @@ const messageListRole = computed(() =>
 );
 
 const {
-  fetchMcps: fetchMcpsFromToolbar,
   fetchQuickPhrases: fetchQuickPhrasesFromToolbar,
   renderPromptInputFooter,
 } = usePromptToolbar({
@@ -1219,37 +1135,11 @@ const {
   canCreateNewConversation,
   confirmClearMessages,
   createNewConversation,
-  enableBuiltinTools,
-  generationType,
-  generationTypeButtonLabel,
-  GENERATION_TYPE_OPTIONS,
-  hasAdvancedSettings,
-  onOpenSettings: () => settingsModalApi.open(),
   onSelectQuickPhrase: (item) => {
     prompt.value = prompt.value.trim()
       ? `${prompt.value.trim()}\n${item.content}`
       : item.content;
   },
-  selectedMcpIds,
-  sending,
-  thinking,
-  thinkingButtonLabel,
-  THINKING_OPTIONS,
-  webSearch,
-  webSearchButtonLabel,
-  WEB_SEARCH_OPTIONS,
-});
-
-const [SettingsModal, settingsModalApi] = useVbenModal({
-  class:
-    'h-[min(78vh,760px)] w-[min(960px,92vw)] [overscroll-behavior:contain]',
-  contentClass: 'flex h-0 min-h-0 overflow-hidden',
-  footer: true,
-  onOpenChange(isOpen) {
-    document.documentElement.style.overflow = isOpen ? 'hidden' : '';
-    document.body.style.overflow = isOpen ? 'hidden' : '';
-  },
-  title: '参数设置',
 });
 
 const [RenameConversationForm, renameConversationFormApi] = useVbenForm({
@@ -1288,7 +1178,6 @@ const [RenameConversationModal, renameConversationModalApi] = useVbenModal({
 
 onMounted(async () => {
   await refreshChatResources();
-  await fetchMcpsFromToolbar();
   await fetchQuickPhrasesFromToolbar();
   await initializeSession();
 
@@ -1301,7 +1190,6 @@ onActivated(async () => {
   }
 
   await refreshChatResources();
-  await fetchMcpsFromToolbar();
   await fetchQuickPhrasesFromToolbar();
   if (!activeConversationId.value && activeMessages.value.length === 0) {
     await initializeSession();
@@ -1426,44 +1314,6 @@ onBeforeUnmount(() => {
         :value="prompt"
       />
     </a-card>
-
-    <SettingsModal :show-cancel-button="false" :show-confirm-button="false">
-      <template #title>
-        <span>参数设置</span>
-      </template>
-      <template #append-footer>
-        <a-button danger type="primary" @click="resetModelSettings">
-          重置
-        </a-button>
-      </template>
-      <ChatSettingsPanel
-        v-model:enable-builtin-tools="enableBuiltinTools"
-        v-model:enable-code-execution="enableCodeExecution"
-        v-model:enable-web-fetch="enableWebFetch"
-        v-model:frequency-penalty="frequencyPenalty"
-        :generation-type="generationType"
-        v-model:image-action="imageAction"
-        v-model:image-aspect-ratio="imageAspectRatio"
-        v-model:image-background="imageBackground"
-        v-model:image-input-fidelity="imageInputFidelity"
-        v-model:image-model="imageModel"
-        v-model:image-moderation="imageModeration"
-        v-model:image-output-compression="imageOutputCompression"
-        v-model:image-output-format="imageOutputFormat"
-        v-model:image-partial-images="imagePartialImages"
-        v-model:image-quality="imageQuality"
-        v-model:image-size="imageSize"
-        v-model:logit-bias="logitBias"
-        v-model:max-tokens="maxTokens"
-        v-model:parallel-tool-calls="parallelToolCalls"
-        v-model:presence-penalty="presencePenalty"
-        v-model:seed="seed"
-        v-model:stop-sequences="stopSequences"
-        v-model:temperature="temperature"
-        v-model:timeout="timeout"
-        v-model:top-p="topP"
-      />
-    </SettingsModal>
 
     <RenameConversationModal>
       <RenameConversationForm />

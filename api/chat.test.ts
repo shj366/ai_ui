@@ -15,14 +15,9 @@ const buildChatCompletionRequest = (
   });
 
 const composerParams = {
-  enable_builtin_tools: true,
-  enable_code_execution: true,
-  enable_web_fetch: false,
-  mcp_ids: [1, 2],
   mode: 'create' as const,
   model_id: 'gpt-test',
   provider_id: 8,
-  web_search: 'off' as const,
 };
 
 describe('buildChatCompletionRequest', () => {
@@ -36,14 +31,8 @@ describe('buildChatCompletionRequest', () => {
     expect(request).toMatchObject({
       conversationId: 'conversation-1',
       forwardedProps: {
-        enableBuiltinTools: true,
-        enableCodeExecution: true,
-        enableWebFetch: false,
-        generationType: 'text',
-        mcpIds: [1, 2],
         modelId: 'gpt-test',
         providerId: 8,
-        webSearch: 'off',
       },
       messages: [
         {

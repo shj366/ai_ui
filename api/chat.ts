@@ -1,15 +1,10 @@
 import type {
-  ActivityMessage,
   AssistantMessage,
   DeveloperMessage,
   MessagesSnapshotEvent,
-  ReasoningMessage,
   SystemMessage,
-  ToolMessage,
   UserMessage,
 } from '@ag-ui/core';
-
-import type { Recordable } from '@vben/types';
 
 import type {
   AIChatAttachmentType,
@@ -32,36 +27,8 @@ import {
 export type AIActionResult = null | string;
 
 export interface AIChatForwardedPropsParams {
-  enableBuiltinTools?: boolean;
-  enableCodeExecution?: boolean;
-  enableWebFetch?: boolean;
-  frequencyPenalty?: null | number;
-  generationType?: AIChatGenerationType;
-  imageAction?: AIChatImageActionType | null;
-  imageAspectRatio?: AIChatImageAspectRatioType | null;
-  imageBackground?: AIChatImageBackgroundType | null;
-  imageInputFidelity?: AIChatImageInputFidelityType | null;
-  imageModel?: null | string;
-  imageModeration?: AIChatImageModerationType | null;
-  imageOutputCompression?: null | number;
-  imageOutputFormat?: AIChatImageOutputFormatType | null;
-  imagePartialImages?: null | number;
-  imageQuality?: AIChatImageQualityType | null;
-  imageSize?: AIChatImageSizeType | null;
-  logitBias?: null | Recordable<number>;
-  maxTokens?: null | number;
-  mcpIds?: null | number[];
   modelId: string;
-  parallelToolCalls?: boolean | null;
-  presencePenalty?: null | number;
   providerId: number;
-  seed?: null | number;
-  stopSequences?: null | string[];
-  temperature?: null | number;
-  thinking?: AIChatThinkingType | boolean | null;
-  timeout?: null | number;
-  topP?: null | number;
-  webSearch?: AIWebSearchType;
 }
 
 export interface AIChatCompletionParams {
@@ -74,7 +41,6 @@ export type AIChatProtocolInputMessage =
   | AssistantMessage
   | DeveloperMessage
   | SystemMessage
-  | ToolMessage
   | UserMessage;
 
 export type AIChatProtocolMessagePayload = AIChatProtocolInputMessage[];
@@ -102,12 +68,9 @@ interface AIChatProtocolMessageMetadata {
 }
 
 export type AIChatProtocolConversationMessage =
-  | (ActivityMessage & AIChatProtocolMessageMetadata)
   | (AIChatProtocolMessageMetadata & AssistantMessage)
   | (AIChatProtocolMessageMetadata & DeveloperMessage)
-  | (AIChatProtocolMessageMetadata & ReasoningMessage)
   | (AIChatProtocolMessageMetadata & SystemMessage)
-  | (AIChatProtocolMessageMetadata & ToolMessage)
   | (AIChatProtocolMessageMetadata & UserMessage);
 
 export interface AIChatConversationDetailResult {
@@ -137,81 +100,13 @@ export interface AIChatRegenerateParams {
   forwardedProps: AIChatForwardedPropsParams;
 }
 
-export type AIChatGenerationType = 'image' | 'text';
-export type AIChatImageActionType = 'auto' | 'edit' | 'generate';
-export type AIChatImageAspectRatioType =
-  | '1:1'
-  | '2:3'
-  | '3:2'
-  | '3:4'
-  | '4:3'
-  | '4:5'
-  | '5:4'
-  | '9:16'
-  | '16:9'
-  | '21:9';
-export type AIChatImageBackgroundType = 'auto' | 'opaque' | 'transparent';
-export type AIChatImageInputFidelityType = 'high' | 'low';
-export type AIChatImageModerationType = 'auto' | 'low';
-export type AIChatImageOutputFormatType = 'jpeg' | 'png' | 'webp';
-export type AIChatImageQualityType = 'auto' | 'high' | 'low' | 'medium';
-export type AIChatImageSizeType =
-  | '1K'
-  | '2K'
-  | '4K'
-  | '512'
-  | '1024x1024'
-  | '1024x1536'
-  | '1536x1024'
-  | 'auto';
-export type AIChatThinkingType =
-  | 'high'
-  | 'low'
-  | 'medium'
-  | 'minimal'
-  | 'xhigh';
-export type AIWebSearchType =
-  | 'builtin'
-  | 'duckduckgo'
-  | 'exa'
-  | 'off'
-  | 'tavily';
-
 export interface AIChatComposerParams {
   mode: 'create' | 'edit' | 'regenerate';
   conversation_id?: null | string;
   edit_message_id?: null | number;
   regenerate_message_id?: null | number;
-  generation_type?: AIChatGenerationType;
-  image_action?: AIChatImageActionType | null;
-  image_aspect_ratio?: AIChatImageAspectRatioType | null;
-  image_background?: AIChatImageBackgroundType | null;
-  image_input_fidelity?: AIChatImageInputFidelityType | null;
-  image_model?: null | string;
-  image_moderation?: AIChatImageModerationType | null;
-  image_output_compression?: null | number;
-  image_output_format?: AIChatImageOutputFormatType | null;
-  image_partial_images?: null | number;
-  image_quality?: AIChatImageQualityType | null;
-  image_size?: AIChatImageSizeType | null;
   provider_id: number;
   model_id: string;
-  max_tokens?: null | number;
-  temperature?: null | number;
-  top_p?: null | number;
-  timeout?: null | number;
-  parallel_tool_calls?: boolean | null;
-  seed?: null | number;
-  presence_penalty?: null | number;
-  frequency_penalty?: null | number;
-  logit_bias?: null | Recordable<number>;
-  stop_sequences?: null | string[];
-  thinking?: AIChatThinkingType | boolean | null;
-  enable_builtin_tools?: boolean;
-  enable_code_execution?: boolean;
-  enable_web_fetch?: boolean;
-  mcp_ids?: null | number[];
-  web_search?: AIWebSearchType;
 }
 
 export interface AIChatComposerAttachment {

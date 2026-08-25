@@ -40,24 +40,6 @@ const routes: RouteRecordRaw[] = [
     },
   },
   {
-    name: 'PluginAIConfig',
-    path: '/plugins/ai/config',
-    component: () => import('../views/config/index.vue'),
-    meta: {
-      title: $t('ai.config'),
-      icon: 'codicon:symbol-parameter',
-    },
-  },
-  {
-    name: 'PluginAIMcp',
-    path: '/plugins/ai/mcp',
-    component: () => import('../views/mcp/index.vue'),
-    meta: {
-      title: $t('ai.mcp'),
-      icon: 'simple-icons:modelcontextprotocol',
-    },
-  },
-  {
     name: 'PluginAIQuickPhrase',
     path: '/plugins/ai/quick-phrase',
     component: () => import('../views/quick-phrase/index.vue'),
