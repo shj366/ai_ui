@@ -63,7 +63,14 @@ async function fetchProviders() {
 }
 
 async function fetchDefaultModel() {
-  const model = await getAIAssistantDefaultModelOptionalApi();
+  let model: AIDefaultModelResult | null;
+  try {
+    model = await getAIAssistantDefaultModelOptionalApi();
+  } catch (error) {
+    message.error((error as Error).message);
+    throw error;
+  }
+
   if (model) {
     applyDefaultModel(model);
     return;
@@ -134,10 +141,7 @@ async function submitDefaultModel() {
   try {
     await updateAIAssistantDefaultModelApi(payload);
     message.success('默认助手模型已更新');
-    const model = await getAIAssistantDefaultModelOptionalApi();
-    if (model) {
-      applyDefaultModel(model);
-    }
+    await fetchDefaultModel();
   } finally {
     saving.value = false;
   }

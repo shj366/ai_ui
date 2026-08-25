@@ -48,6 +48,7 @@ import {
 } from './runtime-state';
 import {
   getEventText,
+  isRecord,
   resolveMetadataFilename,
   resolveTimestamp,
 } from './utils';
@@ -80,6 +81,25 @@ function resolveCurrentToolCallId(
   accumulator: AGUIStreamAccumulator,
 ) {
   return resolveToolCallId(event) ?? accumulator.currentToolCallId ?? undefined;
+}
+
+function resolveToolCallResultErrorText(event: ToolCallResultEvent) {
+  const value = event as ToolCallResultEvent & Record<string, unknown>;
+  const candidates = [value.error, value.errorText, value.error_text];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === 'string' && candidate.trim()) {
+      return candidate.trim();
+    }
+    if (isRecord(candidate)) {
+      const message = candidate.message;
+      if (typeof message === 'string' && message.trim()) {
+        return message.trim();
+      }
+    }
+  }
+
+  return '';
 }
 
 function handleActivityDelta(
@@ -721,6 +741,7 @@ function handleToolCallResult(
   }
   const blocks: AIChatMessageBlock[] = [];
   const content = current.content.trim();
+  const errorText = resolveToolCallResultErrorText(current);
   const toolResultBlocks = normalizeAGUIToolResultBlocks(content);
   blocks.push(...toolResultBlocks);
   blocks.unshift(
@@ -736,9 +757,10 @@ function handleToolCallResult(
         : current,
       eventKey: `tool-call:${state.toolCallId}`,
       eventType: current.type,
-      status: 'success',
+      status: errorText ? 'error' : 'success',
       summary: state.toolCallName ?? state.toolCallId,
-      title: '工具结果',
+      text: errorText,
+      title: errorText ? '工具异常' : '工具结果',
     }),
   );
   return createStreamMessage(

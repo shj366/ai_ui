@@ -1,42 +1,22 @@
-import type { SourcesProps } from '@antdv-next/x';
-
-import type {
-  Component,
-  FunctionalComponent,
-  PropType,
-  VNodeArrayChildren,
-} from 'vue';
+import type { BundledLanguage } from 'shiki';
+import type { Component, PropType } from 'vue';
 
 import type { ChatMessageItem } from '../../../runtime/message';
+import type { SourcesProps } from '../components';
 
 import { defineComponent, h } from 'vue';
 
-import { CodeHighlighter, Mermaid, Sources } from '@antdv-next/x';
-import { XMarkdown } from '@antdv-next/x-markdown';
-import Latex from '@antdv-next/x-markdown/plugins/Latex';
-import { Skeleton } from 'antdv-next';
+import CodeBlock from '#/plugins/ai/components/ai-elements/code-block/CodeBlock.vue';
+import CodeBlockActions from '#/plugins/ai/components/ai-elements/code-block/CodeBlockActions.vue';
+import CodeBlockCopyButton from '#/plugins/ai/components/ai-elements/code-block/CodeBlockCopyButton.vue';
+import CodeBlockHeader from '#/plugins/ai/components/ai-elements/code-block/CodeBlockHeader.vue';
+import CodeBlockTitle from '#/plugins/ai/components/ai-elements/code-block/CodeBlockTitle.vue';
+import Loader from '#/plugins/ai/components/ai-elements/loader/Loader.vue';
+import MessageResponse from '#/plugins/ai/components/ai-elements/message/MessageResponse.vue';
 
-import '@antdv-next/x-markdown/themes/index.css';
-import '@antdv-next/x-markdown/themes/light.css';
-import '@antdv-next/x-markdown/themes/dark.css';
-
-const MARKDOWN_INCOMPLETE_IMAGE_COMPONENT = 'incomplete-image';
-const MARKDOWN_INCOMPLETE_LINK_COMPONENT = 'incomplete-link';
-const MARKDOWN_INCOMPLETE_TABLE_COMPONENT = 'incomplete-table';
-const MARKDOWN_INCOMPLETE_HTML_COMPONENT = 'incomplete-html';
-const MARKDOWN_INCOMPLETE_EMPHASIS_COMPONENT = 'incomplete-emphasis';
-const MARKDOWN_INCOMPLETE_INLINE_CODE_COMPONENT = 'incomplete-inline-code';
-const INLINE_DATA_IMAGE_MARKER = 'data:image/';
 const INLINE_BASE64_MARKER = ';base64,';
-const MAX_HIGHLIGHTED_CODE_LENGTH = 60_000;
 const MAX_MARKDOWN_RENDER_LENGTH = 160_000;
-const MAX_MARKDOWN_DATA_IMAGE_BYTES = 8 * 1024 * 1024;
 const STREAMING_MARKDOWN_SAFETY_LENGTH = 80_000;
-const MARKDOWN_CONFIG = {
-  breaks: true,
-  extensions: Latex(),
-  gfm: true,
-};
 
 export type MarkdownSourceItems = NonNullable<SourcesProps['items']>;
 
@@ -56,92 +36,37 @@ const markdownRendererCache = new Map<
   ReturnType<typeof buildMarkdownContentRenderer>
 >();
 
-function extractMarkdownSlotText(value: unknown): string {
-  if (typeof value === 'string') {
-    return value;
+function getSafeMarkdownPayload(content: string): SafeMarkdownPayload {
+  if (content.length <= MAX_MARKDOWN_RENDER_LENGTH) {
+    return { content, truncated: false };
   }
 
-  if (typeof value === 'number') {
-    return String(value);
-  }
-
-  if (Array.isArray(value)) {
-    return value.map((item) => extractMarkdownSlotText(item)).join('');
-  }
-
-  if (value && typeof value === 'object' && 'children' in value) {
-    return extractMarkdownSlotText((value as { children?: unknown }).children);
-  }
-
-  return '';
+  return {
+    content: `${content.slice(0, MAX_MARKDOWN_RENDER_LENGTH)}\n\n> 内容过长，已截断以保持页面流畅。`,
+    truncated: true,
+  };
 }
 
-function decodeIncompleteMarkdownRaw(value: unknown) {
-  if (typeof value !== 'string' || !value) {
-    return '';
+function normalizeMarkdownStreaming(
+  streaming?: MarkdownStreamingInput,
+): MarkdownStreamingState | undefined {
+  if (streaming === undefined) {
+    return undefined;
   }
 
-  try {
-    return decodeURIComponent(value);
-  } catch {
-    return value;
-  }
+  return typeof streaming === 'boolean'
+    ? { hasNextChunk: streaming }
+    : { hasNextChunk: Boolean(streaming.hasNextChunk) };
 }
 
-function getSafeMarkdownMediaSource(value: unknown) {
-  const source = typeof value === 'string' ? value.trim() : '';
-  if (isSafeMarkdownDataImage(source)) {
-    return source;
+export function createAIReplyMarkdownStreaming(
+  message: ChatMessageItem,
+): MarkdownStreamingState | undefined {
+  if (message.role !== 'assistant') {
+    return undefined;
   }
 
-  if (
-    !source ||
-    source.length > 2048 ||
-    isDataUrl(source) ||
-    /^javascript:/iu.test(source)
-  ) {
-    return '';
-  }
-
-  return source;
-}
-
-function getSafeMarkdownHref(value: unknown) {
-  const href = typeof value === 'string' ? value.trim() : '';
-  if (
-    !href ||
-    href.length > 4096 ||
-    isDataUrl(href) ||
-    /^(?:javascript|vbscript):/iu.test(href)
-  ) {
-    return '';
-  }
-
-  return href;
-}
-
-function getMarkdownCodeLanguage(attrs: Record<string, unknown>) {
-  const dataLang =
-    typeof attrs['data-lang'] === 'string' ? attrs['data-lang'] : '';
-  const dataLangCamel =
-    typeof attrs.dataLang === 'string' ? attrs.dataLang : '';
-  const lang = typeof attrs.lang === 'string' ? attrs.lang : '';
-  const className = typeof attrs.class === 'string' ? attrs.class : '';
-  const classLang =
-    className.match(/(?:^|\s)language-([^\s]+)/u)?.[1] ??
-    className.match(/(?:^|\s)lang-([^\s]+)/u)?.[1] ??
-    '';
-
-  return (dataLang || dataLangCamel || lang || classLang || 'text')
-    .trim()
-    .toLowerCase();
-}
-
-function getMarkdownBooleanAttr(
-  attrs: Record<string, unknown>,
-  ...keys: string[]
-) {
-  return keys.some((key) => attrs[key] === true || attrs[key] === 'true');
+  return { hasNextChunk: Boolean(message.streaming) };
 }
 
 export function isDataUrl(value?: string): value is string {
@@ -166,21 +91,11 @@ export function getDataUrlInfo(value?: string) {
   } else if (value.endsWith('=')) {
     padding = 1;
   }
-  const byteSize = Math.max(0, Math.floor((base64Length * 3) / 4) - padding);
 
   return {
-    byteSize,
+    byteSize: Math.max(0, Math.floor((base64Length * 3) / 4) - padding),
     mimeType,
   };
-}
-
-function isSafeMarkdownDataImage(value: string) {
-  if (!/^data:image\/(?!svg\+xml)[\w.+-]+;base64,/iu.test(value)) {
-    return false;
-  }
-
-  const info = getDataUrlInfo(value);
-  return Boolean(info && info.byteSize <= MAX_MARKDOWN_DATA_IMAGE_BYTES);
 }
 
 export function formatByteSize(byteSize?: number) {
@@ -199,135 +114,6 @@ export function formatByteSize(byteSize?: number) {
   return `${(byteSize / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function getSafeMarkdownPayload(content: string): SafeMarkdownPayload {
-  if (content.length <= MAX_MARKDOWN_RENDER_LENGTH) {
-    return {
-      content,
-      truncated: false,
-    };
-  }
-
-  return {
-    content: `${content.slice(0, MAX_MARKDOWN_RENDER_LENGTH)}\n\n> 内容过长，已截断以保持页面流畅。`,
-    truncated: true,
-  };
-}
-
-function shouldUseStreamingMarkdownFallback(content: string) {
-  return content.length > STREAMING_MARKDOWN_SAFETY_LENGTH;
-}
-
-function normalizeMarkdownStreaming(
-  streaming?: MarkdownStreamingInput,
-): MarkdownStreamingState | undefined {
-  if (streaming === undefined) {
-    return undefined;
-  }
-
-  if (typeof streaming === 'boolean') {
-    return {
-      hasNextChunk: streaming,
-    };
-  }
-
-  return {
-    hasNextChunk: Boolean(streaming.hasNextChunk),
-  };
-}
-
-export function createAIReplyMarkdownStreaming(
-  message: ChatMessageItem,
-): MarkdownStreamingState | undefined {
-  if (message.role !== 'assistant') {
-    return undefined;
-  }
-
-  return {
-    hasNextChunk: Boolean(message.streaming),
-  };
-}
-
-export function renderCodeBlock(
-  content: string,
-  language = 'text',
-  isDark = false,
-) {
-  if (content.length > MAX_HIGHLIGHTED_CODE_LENGTH) {
-    return renderPlainCodeBlock(
-      `${content.slice(0, MAX_HIGHLIGHTED_CODE_LENGTH)}\n\n/* 内容过长，已截断以保持页面流畅。 */`,
-      language,
-    );
-  }
-
-  return h('div', { class: 'min-w-0 w-full max-w-full overflow-hidden' }, [
-    h(CodeHighlighter, {
-      content,
-      language,
-      showCopyButton: true,
-      showLanguage: true,
-      showLineNumbers: content.split('\n').length > 6,
-      showThemeToggle: false,
-      theme: isDark ? 'dark' : 'light',
-    }),
-  ]);
-}
-
-function renderPlainCodeBlock(content: string, language = 'text') {
-  return h(
-    'pre',
-    {
-      class:
-        'max-h-[420px] max-w-full overflow-auto rounded-xl bg-muted p-3 text-xs leading-5 text-foreground',
-    },
-    [h('code', { class: `language-${language}` }, content)],
-  );
-}
-
-export function renderMermaidBlock(content: string, isDark = false) {
-  if (content.length > MAX_HIGHLIGHTED_CODE_LENGTH) {
-    return renderPlainCodeBlock(content, 'mermaid');
-  }
-
-  return h('div', { class: 'max-w-full overflow-x-auto' }, [
-    h(Mermaid, {
-      codeHighlighterProps: {
-        showThemeToggle: false,
-        theme: isDark ? 'dark' : 'light',
-      },
-      content,
-    }),
-  ]);
-}
-
-function renderMarkdownSafetyNotice(content: string) {
-  const markerIndex = content.indexOf(INLINE_DATA_IMAGE_MARKER);
-  const preview =
-    markerIndex > 0
-      ? content.slice(0, Math.min(markerIndex, 1200)).trim()
-      : content.slice(0, 1200).trim();
-
-  return h('div', { class: 'space-y-2' }, [
-    preview
-      ? h(
-          'div',
-          {
-            class:
-              'text-sm leading-6 whitespace-pre-wrap break-words text-foreground/90',
-          },
-          preview,
-        )
-      : null,
-    h(
-      'div',
-      {
-        class:
-          'rounded-xl border border-primary/20 bg-primary/[0.04] px-3 py-2 text-xs leading-5 text-muted-foreground',
-      },
-      '正在接收图片或大段内容，已暂停 Markdown 实时解析以避免浏览器卡死。',
-    ),
-  ]);
-}
-
 export function normalizeInlineSourceItems(
   sourceItems: MarkdownSourceItems,
 ): MarkdownSourceItems {
@@ -338,337 +124,69 @@ export function normalizeInlineSourceItems(
   }));
 }
 
-function createMarkdownSupComponent(sourceItems: MarkdownSourceItems) {
-  const normalizedItems = normalizeInlineSourceItems(sourceItems);
-  const MarkdownSupSources: FunctionalComponent = (_, { slots }) => {
-    const title = extractMarkdownSlotText(slots.default?.()).trim();
-    const sourceIndex = Number.parseInt(title || '0', 10) - 1;
-    const activeItem =
-      normalizedItems[sourceIndex] ??
-      normalizedItems.find((item) => String(item.key) === title);
+function normalizeCodeLanguage(language = 'text') {
+  const normalized = language.trim().toLowerCase() || 'text';
+  return normalized === 'mermaid' ? 'markdown' : normalized;
+}
 
-    if (!activeItem) {
-      return h(
-        'sup',
-        {
-          class:
-            'mx-0.5 rounded bg-primary/10 px-1 text-[0.72em] font-semibold text-primary',
-        },
-        slots.default?.() as undefined | VNodeArrayChildren,
-      );
+export function renderCodeBlock(content: string, language = 'text') {
+  const normalizedLanguage = normalizeCodeLanguage(language);
+  return h(
+    CodeBlock,
+    {
+      code: content,
+      language: normalizedLanguage as BundledLanguage,
+    },
+    () => [
+      h(CodeBlockHeader, {}, () => [
+        h(CodeBlockTitle, {}, () => language || 'text'),
+        h(CodeBlockActions, {}, () => h(CodeBlockCopyButton)),
+      ]),
+    ],
+  );
+}
+
+export function renderMermaidBlock(content: string) {
+  return renderCodeBlock(content, 'mermaid');
+}
+
+function linkSourceReferences(
+  content: string,
+  sourceItems: MarkdownSourceItems,
+) {
+  if (sourceItems.length === 0) {
+    return content;
+  }
+
+  const items = normalizeInlineSourceItems(sourceItems);
+  return content.replaceAll(/\[(\d+)\](?!\()/gu, (match, value: string) => {
+    const index = Number.parseInt(value, 10) - 1;
+    const item = items[index];
+    if (!item?.url) {
+      return match;
     }
+    return `[${value}](${item.url})`;
+  });
+}
 
-    return h(Sources, {
-      activeKey: activeItem.key,
-      inline: true,
-      items: normalizedItems,
-      title: title || activeItem.key,
-    });
-  };
-
-  return MarkdownSupSources;
+function renderMarkdownSafetyNotice(content: string) {
+  return h('div', { class: 'flex min-w-0 flex-col gap-2' }, [
+    content.trim()
+      ? h(MessageResponse, {
+          class: 'text-sm leading-6',
+          content: content.slice(0, 1200),
+        })
+      : null,
+    h('div', { class: 'inline-flex items-center gap-2 text-xs text-muted-foreground' }, [
+      h(Loader, { size: 14 }),
+      '正在接收图片或大段内容，已暂停 Markdown 实时解析以避免浏览器卡死',
+    ]),
+  ]);
 }
 
 function buildMarkdownContentRenderer(isDark = false) {
-  const markdownClassName = [
-    'x-markdown',
-    isDark ? 'x-markdown-dark' : 'x-markdown-light',
-    'min-w-0 max-w-full',
-  ].join(' ');
-
-  const MarkdownPre: FunctionalComponent = (_, { slots }) => {
-    return h(
-      'div',
-      { class: 'max-w-full overflow-x-auto' },
-      (slots.default?.() as undefined | VNodeArrayChildren) ?? undefined,
-    );
-  };
-
-  const MarkdownStreamTail: FunctionalComponent = () => {
-    return h('span', {
-      'aria-hidden': 'true',
-      class:
-        'ml-0.5 inline-block h-4 w-1 translate-y-0.5 animate-pulse rounded-full bg-primary align-baseline',
-    });
-  };
-
-  const IncompleteImage: FunctionalComponent = () => {
-    return h(
-      'span',
-      {
-        class:
-          'my-2 inline-flex items-center rounded-xl border border-border/70 bg-muted/30 p-2',
-      },
-      [
-        h(Skeleton.Image, {
-          active: true,
-          style: {
-            height: '60px',
-            width: '60px',
-          },
-        }),
-      ],
-    );
-  };
-
-  const IncompleteLink: FunctionalComponent = (_, { attrs }) => {
-    const text = decodeIncompleteMarkdownRaw(attrs['data-raw']);
-    const linkTextMatch = text.match(/^\[([^\]]*)\]/u);
-    const displayText = linkTextMatch ? linkTextMatch[1] : text.slice(1);
-
-    return h(
-      'a',
-      {
-        class: 'text-primary underline underline-offset-4',
-        href: '#',
-        style: { pointerEvents: 'none' },
-      },
-      displayText,
-    );
-  };
-
-  const IncompleteTable: FunctionalComponent = () => {
-    return h('div', { class: 'my-3 max-w-full overflow-hidden rounded-xl' }, [
-      h(Skeleton.Node, {
-        active: true,
-        style: {
-          height: '96px',
-          width: 'min(360px, 100%)',
-        },
-      }),
-    ]);
-  };
-
-  const IncompleteHtml: FunctionalComponent = () => {
-    return h('div', { class: 'my-3 max-w-full overflow-hidden rounded-xl' }, [
-      h(Skeleton.Node, {
-        active: true,
-        style: {
-          height: '120px',
-          width: 'min(383px, 100%)',
-        },
-      }),
-    ]);
-  };
-
-  const IncompleteEmphasis: FunctionalComponent = (_, { attrs }) => {
-    const text = decodeIncompleteMarkdownRaw(attrs['data-raw']);
-    const match = text.match(/^([*_]{1,3})([^*_]*)/u);
-    if (!match?.[2]) {
-      return null;
-    }
-
-    const symbols = match[1] ?? '';
-    const content = match[2] ?? '';
-    if (symbols.length === 1) {
-      return h('em', content);
-    }
-    if (symbols.length === 2) {
-      return h('strong', content);
-    }
-    return h('em', [h('strong', content)]);
-  };
-
-  const IncompleteInlineCode: FunctionalComponent = (_, { attrs }) => {
-    const text = decodeIncompleteMarkdownRaw(attrs['data-raw']);
-    if (!text) {
-      return null;
-    }
-
-    return h(
-      'code',
-      {
-        class:
-          'rounded bg-muted px-1.5 py-0.5 font-mono text-[0.92em] text-foreground',
-      },
-      text.slice(1),
-    );
-  };
-
-  const MarkdownCode: FunctionalComponent = (_, { attrs, slots }) => {
-    const content = extractMarkdownSlotText(slots.default?.());
-    const language = getMarkdownCodeLanguage(attrs);
-    const isBlock = getMarkdownBooleanAttr(
-      attrs,
-      'data-block',
-      'dataBlock',
-      'block',
-    );
-    const streamStatus = attrs.streamStatus;
-
-    if (!isBlock) {
-      return h(
-        'code',
-        {
-          class:
-            'rounded bg-muted px-1.5 py-0.5 font-mono text-[0.92em] text-foreground',
-        },
-        slots.default?.() as undefined | VNodeArrayChildren,
-      );
-    }
-
-    if (streamStatus === 'loading') {
-      return renderPlainCodeBlock(content, language);
-    }
-
-    if (language === 'mermaid') {
-      return renderMermaidBlock(content, isDark);
-    }
-
-    return renderCodeBlock(content, language, isDark);
-  };
-
-  const MarkdownImage: FunctionalComponent = (_, { attrs }) => {
-    const src = getSafeMarkdownMediaSource(attrs.src);
-    if (
-      !src ||
-      src.startsWith('about:blank#generated-image') ||
-      isDataUrl(src)
-    ) {
-      return null;
-    }
-
-    return h('img', {
-      ...attrs,
-      class: ['max-w-full rounded-xl', attrs.class].filter(Boolean).join(' '),
-      decoding: 'async',
-      loading: 'lazy',
-      src,
-    });
-  };
-
-  const MarkdownAnchor: FunctionalComponent = (_, { attrs, slots }) => {
-    const href = getSafeMarkdownHref(attrs.href);
-    if (!href) {
-      return h(
-        'span',
-        {
-          class: ['font-medium text-foreground', attrs.class]
-            .filter(Boolean)
-            .join(' '),
-        },
-        slots.default?.() as undefined | VNodeArrayChildren,
-      );
-    }
-
-    return h(
-      'a',
-      {
-        ...attrs,
-        class: [
-          'font-medium text-primary underline underline-offset-4 hover:text-primary/80',
-          attrs.class,
-        ]
-          .filter(Boolean)
-          .join(' '),
-        href,
-        rel: 'noopener noreferrer',
-        target: '_blank',
-      },
-      slots.default?.() as undefined | VNodeArrayChildren,
-    );
-  };
-
-  const MarkdownBlockquote: FunctionalComponent = (_, { slots }) => {
-    return h(
-      'blockquote',
-      {
-        class:
-          'my-3 border-l-4 border-primary/40 bg-muted/35 py-2 pl-4 pr-3 text-muted-foreground',
-      },
-      slots.default?.() as undefined | VNodeArrayChildren,
-    );
-  };
-
-  const MarkdownTable: FunctionalComponent = (_, { slots }) => {
-    return h(
-      'div',
-      {
-        class:
-          'my-3 max-w-full overflow-x-auto rounded-xl border border-border/70 bg-background/60',
-      },
-      [
-        h(
-          'table',
-          { class: 'min-w-full border-collapse text-sm' },
-          slots.default?.() as undefined | VNodeArrayChildren,
-        ),
-      ],
-    );
-  };
-
-  const MarkdownTableHead: FunctionalComponent = (_, { slots }) => {
-    return h(
-      'thead',
-      { class: 'bg-muted/60 text-foreground' },
-      slots.default?.() as undefined | VNodeArrayChildren,
-    );
-  };
-
-  const MarkdownTableCell: FunctionalComponent = (_, { attrs, slots }) => {
-    return h(
-      'td',
-      {
-        ...attrs,
-        class: ['border-t border-border/70 px-3 py-2 align-top', attrs.class]
-          .filter(Boolean)
-          .join(' '),
-      },
-      slots.default?.() as undefined | VNodeArrayChildren,
-    );
-  };
-
-  const MarkdownTableHeaderCell: FunctionalComponent = (
-    _,
-    { attrs, slots },
-  ) => {
-    return h(
-      'th',
-      {
-        ...attrs,
-        class: [
-          'border-b border-border/70 px-3 py-2 text-left font-semibold',
-          attrs.class,
-        ]
-          .filter(Boolean)
-          .join(' '),
-      },
-      slots.default?.() as undefined | VNodeArrayChildren,
-    );
-  };
-
-  const MarkdownSupFallback: FunctionalComponent = (_, { slots }) => {
-    return h(
-      'sup',
-      {
-        class:
-          'mx-0.5 rounded bg-primary/10 px-1 text-[0.72em] font-semibold text-primary',
-      },
-      slots.default?.() as undefined | VNodeArrayChildren,
-    );
-  };
-
-  const baseMarkdownComponents: Record<string, Component> = {
-    [MARKDOWN_INCOMPLETE_IMAGE_COMPONENT]: IncompleteImage,
-    [MARKDOWN_INCOMPLETE_LINK_COMPONENT]: IncompleteLink,
-    [MARKDOWN_INCOMPLETE_TABLE_COMPONENT]: IncompleteTable,
-    [MARKDOWN_INCOMPLETE_HTML_COMPONENT]: IncompleteHtml,
-    [MARKDOWN_INCOMPLETE_EMPHASIS_COMPONENT]: IncompleteEmphasis,
-    [MARKDOWN_INCOMPLETE_INLINE_CODE_COMPONENT]: IncompleteInlineCode,
-    a: MarkdownAnchor,
-    blockquote: MarkdownBlockquote,
-    code: MarkdownCode,
-    img: MarkdownImage,
-    pre: MarkdownPre,
-    sup: MarkdownSupFallback,
-    table: MarkdownTable,
-    td: MarkdownTableCell,
-    th: MarkdownTableHeaderCell,
-    thead: MarkdownTableHead,
-  };
-
   return defineComponent({
-    name: isDark ? 'AIReplyMarkdownContentDark' : 'AIReplyMarkdownContent',
+    name: isDark ? 'AIElementsMarkdownDark' : 'AIElementsMarkdown',
     props: {
       content: {
         default: '',
@@ -688,79 +206,52 @@ function buildMarkdownContentRenderer(isDark = false) {
         const content = props.content ?? '';
         const streaming = normalizeMarkdownStreaming(props.streaming);
         const hasNextChunk = Boolean(streaming?.hasNextChunk);
-        if (hasNextChunk && shouldUseStreamingMarkdownFallback(content)) {
+        if (hasNextChunk && content.length > STREAMING_MARKDOWN_SAFETY_LENGTH) {
           return renderMarkdownSafetyNotice(content);
         }
 
         const payload = getSafeMarkdownPayload(content);
-        const sourceItems = props.sourceItems ?? [];
-        const components =
-          sourceItems.length > 0
-            ? {
-                ...baseMarkdownComponents,
-                sup: createMarkdownSupComponent(sourceItems),
-              }
-            : baseMarkdownComponents;
+        const sourceItems = normalizeInlineSourceItems(props.sourceItems ?? []);
+        const normalizedContent = linkSourceReferences(payload.content, sourceItems);
+        const children = [
+          h(MessageResponse, {
+            class: 'ai-elements-markdown min-w-0 max-w-full text-sm leading-6 text-foreground',
+            content: normalizedContent,
+          }),
+        ];
 
-        const markdownNode = h(XMarkdown, {
-          className: markdownClassName,
-          components,
-          config: MARKDOWN_CONFIG,
-          content: payload.content,
-          escapeRawHtml: false,
-          openLinksInNewTab: true,
-          paragraphTag: 'div',
-          protectCustomTagNewlines: true,
-          ...(streaming
-            ? {
-                streaming: {
-                  animationConfig: {
-                    easing: 'ease-in-out',
-                    fadeDuration: 140,
-                  },
-                  enableAnimation: true,
-                  hasNextChunk,
-                  incompleteMarkdownComponentMap: {
-                    emphasis: MARKDOWN_INCOMPLETE_EMPHASIS_COMPONENT,
-                    html: MARKDOWN_INCOMPLETE_HTML_COMPONENT,
-                    image: MARKDOWN_INCOMPLETE_IMAGE_COMPONENT,
-                    'inline-code': MARKDOWN_INCOMPLETE_INLINE_CODE_COMPONENT,
-                    link: MARKDOWN_INCOMPLETE_LINK_COMPONENT,
-                    table: MARKDOWN_INCOMPLETE_TABLE_COMPONENT,
-                  },
-                  ...(hasNextChunk
-                    ? { tail: { component: MarkdownStreamTail } }
-                    : {}),
-                },
-              }
-            : {}),
-        });
+        if (hasNextChunk) {
+          children.push(
+            h('span', {
+              'aria-hidden': 'true',
+              class:
+                'ml-0.5 inline-block h-4 w-1 translate-y-0.5 animate-pulse rounded-full bg-primary align-baseline',
+            }),
+          );
+        }
 
-        if (!payload.truncated) {
-          return markdownNode;
+        if (payload.truncated) {
+          children.push(
+            h('div', { class: 'text-xs leading-5 text-muted-foreground' }, '内容过长，已截断以保持页面流畅'),
+          );
         }
 
         return h(
           'div',
-          { class: 'min-w-0 max-w-full space-y-3' },
-          [
-            markdownNode,
-            h(
-              'div',
-              {
-                class:
-                  'rounded-xl border border-border/70 bg-muted/30 px-3 py-2 text-xs leading-5 text-muted-foreground',
-              },
-              '内容过长，已截断以保持页面流畅。',
-            ),
-          ].filter(Boolean),
+          {
+            class: [
+              'min-w-0 max-w-full space-y-3',
+              isDark ? 'ai-elements-markdown--dark' : '',
+            ],
+          },
+          children,
         );
       };
     },
   });
 }
 
-export function createMarkdownContentRenderer(isDark = false) {
+export function createMarkdownContentRenderer(isDark = false): Component {
   const cached = markdownRendererCache.get(isDark);
   if (cached) {
     return cached;

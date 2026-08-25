@@ -9,7 +9,6 @@ import type { ChatMessageItem } from '../../../runtime/message';
 import { computed, ref } from 'vue';
 
 import {
-  clearAIChatConversationContextApi,
   clearAIChatConversationMessagesApi,
   deleteAIChatConversationApi,
   deleteAIChatMessageApi,
@@ -18,7 +17,7 @@ import {
   pinAIChatConversationApi,
 } from '../../../api/chat';
 import {
-  mergeAdjacentAssistantMessages,
+  mergeAdjacentAssistantMessagesInOrder,
   normalizeMessage,
 } from '../../../runtime/message';
 
@@ -33,13 +32,22 @@ interface UseChatSessionOptions {
   notifySuccess: (content: string) => void;
   renameConversationFormData: Ref<AIChatConversationResult | undefined>;
   resetComposerState: (clearPrompt?: boolean) => void;
-  scrollToBottom: () => void;
+  resetMessageListViewport?: () => void;
+  scrollToBottom: (force?: boolean) => void;
   scrollToTop: () => void;
   selectedModelId: Ref<string | undefined>;
   selectedProviderId: Ref<number | undefined>;
   clearTransientMessages: () => void;
-  stopStreaming: () => void;
+  isConversationRequesting?: (conversationId?: string) => boolean;
+  stopStreaming: (conversationId?: string) => Promise<void> | void;
   transientRequestError: Ref<null | string>;
+}
+
+interface LoadConversationDetailOptions {
+  clearTransientMessages?: boolean;
+  forceAutoFollow?: boolean;
+  scrollToBottom?: boolean;
+  showLoading?: boolean;
 }
 
 export function useChatSession(options: UseChatSessionOptions) {
@@ -54,9 +62,30 @@ export function useChatSession(options: UseChatSessionOptions) {
   const conversationBeforeCursor = ref<string>();
 
   let currentConversationFetchId = 0;
+  const messageCache = new Map<string, ChatMessageItem[]>();
+  const conversationDetailCache = new Map<string, AIChatConversationDetail>();
+
+  function normalizeConversationMessages(detail: AIChatConversationDetail) {
+    return mergeAdjacentAssistantMessagesInOrder(
+      detail.messages.map((item, index) =>
+        normalizeMessage(item, index, detail.conversation_id),
+      ),
+    );
+  }
 
   function setActiveConversationKey(value: string) {
+    const previousId = activeConversationId.value;
+    if (previousId && previousId !== value) {
+      messageCache.set(previousId, activeMessages.value);
+      if (activeConversationDetail.value?.conversation_id === previousId) {
+        conversationDetailCache.set(previousId, activeConversationDetail.value);
+      }
+    }
     activeConversationId.value = value;
+    activeMessages.value = value ? (messageCache.get(value) ?? []) : [];
+    activeConversationDetail.value = value
+      ? conversationDetailCache.get(value)
+      : undefined;
   }
 
   function replaceConversationSummaries(items: AIChatConversationResult[]) {
@@ -77,18 +106,30 @@ export function useChatSession(options: UseChatSessionOptions) {
   }
 
   function upsertConversationSummary(summary: AIChatConversationResult) {
-    const index = conversationSummaries.value.findIndex(
+    const items = [...conversationSummaries.value];
+    const index = items.findIndex(
       (item) => item.conversation_id === summary.conversation_id,
     );
-
     if (index !== -1) {
-      const next = [...conversationSummaries.value];
-      next[index] = summary;
-      conversationSummaries.value = next;
+      items[index] = {
+        ...items[index],
+        ...summary,
+        created_time: items[index]?.created_time || summary.created_time,
+      };
+      conversationSummaries.value = items;
       return;
     }
-
-    conversationSummaries.value = [summary, ...conversationSummaries.value];
+    if (summary.is_pinned) {
+      items.unshift(summary);
+    } else {
+      const insertAt = items.findIndex((item) => !item.is_pinned);
+      if (insertAt === -1) {
+        items.push(summary);
+      } else {
+        items.splice(insertAt, 0, summary);
+      }
+    }
+    conversationSummaries.value = items;
   }
 
   function removeConversationSummary(conversationId: string) {
@@ -105,12 +146,8 @@ export function useChatSession(options: UseChatSessionOptions) {
   });
 
   function createNewConversation() {
-    options.stopStreaming();
     currentConversationFetchId++;
     setActiveConversationKey('');
-    activeConversationDetail.value = undefined;
-    activeMessages.value = [];
-    options.clearTransientMessages();
     options.draftConversationTitle.value = '新话题';
     detailLoading.value = false;
     options.resetComposerState(true);
@@ -123,17 +160,63 @@ export function useChatSession(options: UseChatSessionOptions) {
       conversation_id: detail.conversation_id,
       created_time: detail.created_time,
       id: detail.id,
+      is_generating: detail.is_generating,
       is_pinned: detail.is_pinned,
       title: detail.title,
       updated_time: detail.updated_time,
     });
   }
 
-  async function fetchConversations(append = false) {
-    if (append) {
-      sidebarMoreLoading.value = true;
-    } else {
-      sidebarLoading.value = true;
+  function syncActiveMessageMetadataFromDetail(
+    detail: AIChatConversationDetail,
+  ) {
+    const persistedMessages = mergeAdjacentAssistantMessagesInOrder(
+      detail.messages.map((item, index) =>
+        normalizeMessage(item, index, detail.conversation_id),
+      ),
+    );
+
+    if (activeMessages.value.length !== persistedMessages.length) {
+      return;
+    }
+
+    const canSyncMetadata = activeMessages.value.every((message, index) => {
+      return message.role === persistedMessages[index]?.role;
+    });
+
+    if (!canSyncMetadata) {
+      return;
+    }
+
+    activeMessages.value = activeMessages.value.map((message, index) => {
+      const persistedMessage = persistedMessages[index];
+
+      if (!persistedMessage) {
+        return message;
+      }
+
+      return {
+        ...message,
+        conversation_id:
+          persistedMessage.conversation_id ?? detail.conversation_id,
+        created_time: persistedMessage.created_time || message.created_time,
+        message_id: persistedMessage.message_id ?? message.message_id ?? null,
+        message_index: persistedMessage.message_index ?? message.message_index,
+        message_type: persistedMessage.message_type ?? message.message_type,
+        model_id: persistedMessage.model_id ?? message.model_id ?? null,
+        provider_id:
+          persistedMessage.provider_id ?? message.provider_id ?? null,
+      };
+    });
+  }
+
+  async function fetchConversations(append = false, silent = false) {
+    if (!silent) {
+      if (append) {
+        sidebarMoreLoading.value = true;
+      } else {
+        sidebarLoading.value = true;
+      }
     }
 
     try {
@@ -151,21 +234,62 @@ export function useChatSession(options: UseChatSessionOptions) {
       hasMoreConversations.value = data.has_more;
       conversationBeforeCursor.value = data.next_cursor || undefined;
     } finally {
-      if (append) {
-        sidebarMoreLoading.value = false;
-      } else {
-        sidebarLoading.value = false;
+      if (!silent) {
+        if (append) {
+          sidebarMoreLoading.value = false;
+        } else {
+          sidebarLoading.value = false;
+        }
       }
     }
   }
 
-  async function loadConversationDetail(conversationId: string) {
+  async function syncConversationDetailMetadata(conversationId: string) {
+    const fetchId = currentConversationFetchId;
+    const detail = await getAIChatConversationDetailApi(conversationId);
+    const persistedMessages = normalizeConversationMessages(detail);
+
+    syncConversationSummaryFromDetail(detail);
+    conversationDetailCache.set(conversationId, detail);
+    messageCache.set(conversationId, persistedMessages);
+
+    if (
+      fetchId !== currentConversationFetchId ||
+      activeConversationId.value !== conversationId
+    ) {
+      return;
+    }
+
+    syncActiveMessageMetadataFromDetail(detail);
+    activeConversationDetail.value = detail;
+    messageCache.set(conversationId, activeMessages.value);
+    options.transientRequestError.value = null;
+    options.selectedProviderId.value = detail.provider_id;
+    options.selectedModelId.value = detail.model_id;
+    options.draftConversationTitle.value = detail.title;
+  }
+
+  async function loadConversationDetail(
+    conversationId: string,
+    loadOptions: LoadConversationDetailOptions = {},
+  ) {
+    const {
+      clearTransientMessages = true,
+      forceAutoFollow = true,
+      scrollToBottom = false,
+      showLoading = true,
+    } = loadOptions;
     const fetchId = ++currentConversationFetchId;
-    detailLoading.value = true;
+    detailLoading.value = showLoading;
     let shouldScrollToBottom = false;
 
     try {
       const detail = await getAIChatConversationDetailApi(conversationId);
+      const messages = normalizeConversationMessages(detail);
+
+      syncConversationSummaryFromDetail(detail);
+      conversationDetailCache.set(conversationId, detail);
+      messageCache.set(conversationId, messages);
 
       if (
         fetchId !== currentConversationFetchId ||
@@ -174,25 +298,24 @@ export function useChatSession(options: UseChatSessionOptions) {
         return;
       }
 
-      syncConversationSummaryFromDetail(detail);
       activeConversationDetail.value = detail;
-      activeMessages.value = mergeAdjacentAssistantMessages(
-        detail.messages.map((item, index) =>
-          normalizeMessage(item, index, conversationId),
-        ),
-      );
-      options.clearTransientMessages();
+      activeMessages.value = messages;
+      if (clearTransientMessages) {
+        options.clearTransientMessages();
+      }
       options.transientRequestError.value = null;
       options.selectedProviderId.value = detail.provider_id;
       options.selectedModelId.value = detail.model_id;
       options.draftConversationTitle.value = detail.title;
-      options.autoFollowMessageScroll.value = true;
-      shouldScrollToBottom = true;
+      if (forceAutoFollow) {
+        options.autoFollowMessageScroll.value = true;
+      }
+      shouldScrollToBottom = scrollToBottom;
     } finally {
       if (fetchId === currentConversationFetchId) {
         detailLoading.value = false;
         if (shouldScrollToBottom) {
-          options.scrollToBottom();
+          options.scrollToBottom(true);
         }
       }
     }
@@ -204,15 +327,28 @@ export function useChatSession(options: UseChatSessionOptions) {
       activeMessages.value.length > 0 &&
       !detailLoading.value
     ) {
+      options.autoFollowMessageScroll.value = true;
+      options.resetMessageListViewport?.();
+      options.scrollToBottom(true);
       return;
     }
 
-    options.stopStreaming();
-    options.clearTransientMessages();
     options.resetComposerState(true);
     setActiveConversationKey(conversationId);
-    activeConversationDetail.value = undefined;
-    await loadConversationDetail(conversationId);
+    options.autoFollowMessageScroll.value = true;
+    if (activeMessages.value.length > 0) {
+      options.scrollToBottom(true);
+    }
+    if (options.isConversationRequesting?.(conversationId)) {
+      return;
+    }
+    const hasCachedContent = Boolean(
+      activeMessages.value.length > 0 || activeConversationDetail.value,
+    );
+    await loadConversationDetail(conversationId, {
+      showLoading: !hasCachedContent,
+      scrollToBottom: true,
+    });
   }
 
   async function loadMoreConversations() {
@@ -252,8 +388,10 @@ export function useChatSession(options: UseChatSessionOptions) {
   }
 
   async function removeConversation(conversationId: string) {
-    options.stopStreaming();
+    await options.stopStreaming(conversationId);
     await deleteAIChatConversationApi(conversationId);
+    conversationDetailCache.delete(conversationId);
+    messageCache.delete(conversationId);
     removeConversationSummary(conversationId);
     await closeRenameModalIfMatched(conversationId);
 
@@ -285,7 +423,7 @@ export function useChatSession(options: UseChatSessionOptions) {
   }
 
   async function clearMessages() {
-    options.stopStreaming();
+    await options.stopStreaming(activeConversationId.value);
     const conversation = activeConversation.value;
     const conversationId = activeConversationId.value;
 
@@ -296,16 +434,22 @@ export function useChatSession(options: UseChatSessionOptions) {
 
     await clearAIChatConversationMessagesApi(conversationId);
     activeMessages.value = [];
+    messageCache.set(conversationId, []);
     if (activeConversationDetail.value) {
       activeConversationDetail.value = {
         ...activeConversationDetail.value,
         message_count: 0,
         messages: [],
       };
+      conversationDetailCache.set(
+        conversationId,
+        activeConversationDetail.value,
+      );
     }
     if (conversation) {
       upsertConversationSummary({
         ...conversation,
+        is_generating: false,
         updated_time: new Date().toISOString(),
       });
     }
@@ -323,31 +467,6 @@ export function useChatSession(options: UseChatSessionOptions) {
       });
   }
 
-  async function clearConversationContext() {
-    const conversationId = activeConversationId.value;
-    if (!conversationId) {
-      return;
-    }
-
-    options.stopStreaming();
-    options.clearTransientMessages();
-    await clearAIChatConversationContextApi(conversationId);
-    await loadConversationDetail(conversationId);
-    options.notifySuccess('对话上下文已清除');
-  }
-
-  function confirmClearConversationContext() {
-    options
-      .confirmAction({
-        content:
-          '确认清除当前话题的上下文吗？现有消息会保留展示，后续回复将从分割线之后继续',
-        icon: 'warning',
-      })
-      .then(async () => {
-        await clearConversationContext();
-      });
-  }
-
   async function deleteMessageChain(item: ChatMessageItem) {
     const currentConversationId = activeConversationId.value;
 
@@ -359,25 +478,39 @@ export function useChatSession(options: UseChatSessionOptions) {
       return;
     }
 
-    options.stopStreaming();
+    await options.stopStreaming(currentConversationId);
 
     await deleteAIChatMessageApi(currentConversationId, item.message_id);
-    await fetchConversations(false);
-
-    const stillExists = conversationSummaries.value.some(
-      (conversation) => conversation.conversation_id === currentConversationId,
+    activeMessages.value = activeMessages.value.filter(
+      (message) => message.id !== item.id,
     );
+    messageCache.set(currentConversationId, activeMessages.value);
 
-    if (stillExists) {
-      await loadConversationDetail(currentConversationId);
-    } else if (conversationSummaries.value[0]) {
-      await closeRenameModalIfMatched(currentConversationId);
-      const nextConversationId = conversationSummaries.value[0].conversation_id;
-      setActiveConversationKey(nextConversationId);
-      await loadConversationDetail(nextConversationId);
-    } else {
-      await closeRenameModalIfMatched(currentConversationId);
-      createNewConversation();
+    if (activeConversationDetail.value) {
+      activeConversationDetail.value = {
+        ...activeConversationDetail.value,
+        message_count: Math.max(
+          0,
+          (activeConversationDetail.value.message_count ??
+            activeMessages.value.length + 1) - 1,
+        ),
+        messages: activeConversationDetail.value.messages.filter(
+          (message) => message.message_id !== item.message_id,
+        ),
+        updated_time: new Date().toISOString(),
+      };
+      conversationDetailCache.set(
+        currentConversationId,
+        activeConversationDetail.value,
+      );
+    }
+
+    const conversation = activeConversation.value;
+    if (conversation) {
+      upsertConversationSummary({
+        ...conversation,
+        updated_time: new Date().toISOString(),
+      });
     }
 
     options.notifySuccess('聊天消息已删除');
@@ -393,9 +526,7 @@ export function useChatSession(options: UseChatSessionOptions) {
     activeConversationId,
     activeConversationDetail,
     activeMessages,
-    clearConversationContext,
     clearMessages,
-    confirmClearConversationContext,
     confirmClearMessages,
     confirmRemoveConversation,
     createNewConversation,
@@ -412,6 +543,7 @@ export function useChatSession(options: UseChatSessionOptions) {
     setActiveConversationKey,
     sidebarLoading,
     sidebarMoreLoading,
+    syncConversationDetailMetadata,
     togglePinConversation,
     upsertConversationSummary,
   };

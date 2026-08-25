@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import type {
   AIBatchCreateModelsParams,
-  AIModelParams,
   AIModelResult,
   AIProviderModelResult,
   AIProviderResult,
@@ -36,6 +35,7 @@ import {
   updateAIModelApi,
 } from '../../../api';
 import { createModelSchema, queryModelSchema, useModelColumns } from '../data';
+import { createAIModelPayload, type AIModelFormValues } from '../model-params';
 
 const props = defineProps<{
   provider?: AIProviderResult;
@@ -332,12 +332,8 @@ const [Modal, modalApi] = useVbenModal({
     }
 
     modalApi.lock();
-    const values =
-      await formApi.getValues<Omit<AIModelParams, 'provider_id'>>();
-    const payload: AIModelParams = {
-      ...values,
-      provider_id: props.provider.id,
-    };
+    const values = await formApi.getValues<AIModelFormValues>();
+    const payload = createAIModelPayload(props.provider.id, values);
 
     try {
       await (formData.value?.id

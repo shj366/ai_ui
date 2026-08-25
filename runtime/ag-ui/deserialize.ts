@@ -446,9 +446,10 @@ function normalizeAGUIConversationMessage(
           },
           eventKey: `tool-result:${message.toolCallId}`,
           eventType: 'TOOL_CALL_RESULT',
+          status: message.error ? 'error' : 'success',
           summary: message.toolCallId,
           text: message.error ?? (hasExtractedFiles ? '' : message.content),
-          title: '工具结果',
+          title: message.error ? '工具异常' : '工具结果',
         }),
         ...toolResultBlocks,
       ];
@@ -495,11 +496,10 @@ export function normalizeAGUIConversationDetail(
     .filter((message): message is AIChatMessageDetail => message !== null);
 
   return {
-    context_cleared_time: detail.contextClearedTime ?? null,
-    context_start_message_id: detail.contextStartMessageId ?? null,
     conversation_id: detail.conversationId,
     created_time: detail.createdTime,
     id: detail.id,
+    is_generating: Boolean(detail.isGenerating),
     is_pinned: detail.isPinned,
     message_count: messages.length,
     messages,

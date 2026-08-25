@@ -1,12 +1,23 @@
 # AI Plugin
 
-`ai` 插件为系统提供 AI 相关能力。
+`ai` 插件提供企业工作台所需的基础 AI 对话能力
 
 ## 功能概览
 
-- AI Chat：基于 `@antdv-next/x` 与 `@antdv-next/x-markdown` 构建对话界面，支持流式对话、Markdown 展示、代码高亮与 Mermaid 图表渲染
+- AI Chat：支持流式文本对话、Markdown、代码块和附件
 - Topic & History：管理会话话题、聊天历史与消息上下文
 - Quick Phrase：管理快捷短语并在对话时快速复用
 - Provider：管理 AI 供应商配置
-- Model：管理供应商下可用模型
-- MCP：管理可接入的 MCP 服务
+- Model：管理供应商下可用模型与默认模型
+
+## 对话请求流程
+
+```text
+用户输入消息
+  -> 选择供应商和模型
+  -> 发送基础文本或附件消息
+  -> 通过 AG-UI 接收流式文本
+  -> 合并并持久化会话消息
+```
+
+插件只保留基础对话所需的请求字段：`provider_id`、`model_id`、会话标识和消息内容
