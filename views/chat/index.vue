@@ -684,7 +684,9 @@ async function submitChat(
 
   const sourceConversationId = activeConversationId.value;
   const targetConversationId =
-    sourceConversationId || crypto.randomUUID();
+    sourceConversationId ||
+    (globalThis.crypto?.randomUUID?.() ??
+      `${Date.now()}_${Math.random().toString(36).slice(2)}`);
   const existingSummary = conversationSummaries.value.find(
     (item) => item.conversation_id === targetConversationId,
   );
