@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { CommandItem } from '#/plugins/ai/components/ui/command'
+import { CommandItem } from '#/plugins/ai/components/ui/command';
 
 const props = defineProps<{
-  value: string
-}>()
+  value: string;
+}>();
 </script>
 
 <template>

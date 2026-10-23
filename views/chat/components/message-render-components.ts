@@ -59,7 +59,10 @@ export const FileCardList = defineComponent({
     return () =>
       h(
         Attachments,
-        { class: props.overflow === 'wrap' ? '' : 'overflow-x-auto', variant: 'list' },
+        {
+          class: props.overflow === 'wrap' ? '' : 'overflow-x-auto',
+          variant: 'list',
+        },
         () =>
           props.items.map((item, index) =>
             h(
@@ -71,7 +74,9 @@ export const FileCardList = defineComponent({
                 onClick: item.onClick,
               },
               () => [
-                item.loading ? h(Loader, { class: 'size-4' }) : h(AttachmentPreview),
+                item.loading
+                  ? h(Loader, { class: 'size-4' })
+                  : h(AttachmentPreview),
                 h(AttachmentInfo, { showMediaType: true }),
               ],
             ),
@@ -97,10 +102,16 @@ export const Sources = defineComponent({
     return () => {
       const items = props.items ?? [];
       if (props.inline) {
-        const active = items.find((item) => item.key === props.activeKey) ?? items[0];
+        const active =
+          items.find((item) => item.key === props.activeKey) ?? items[0];
         return active?.url
-          ? h(Source, { href: active.url, title: String(props.title ?? active.title ?? active.url) }, () =>
-              String(props.title ?? active.key ?? ''),
+          ? h(
+              Source,
+              {
+                href: active.url,
+                title: String(props.title ?? active.title ?? active.url),
+              },
+              () => String(props.title ?? active.key ?? ''),
             )
           : h('sup', String(props.title ?? ''));
       }
@@ -110,22 +121,23 @@ export const Sources = defineComponent({
       }
 
       return h(AISources, { defaultOpen: props.defaultExpanded }, () => [
-        h(SourcesTrigger, { count: items.length }, () => `来源 ${items.length}`),
         h(
-          SourcesContent,
-          {},
-          () =>
-            items.map((item, index) =>
-              h(
-                Source,
-                {
-                  key: item.key ?? item.url ?? index,
-                  href: item.url || '#',
-                  title: item.title || item.url || `来源 ${index + 1}`,
-                },
-                () => item.title || item.url || `来源 ${index + 1}`,
-              ),
+          SourcesTrigger,
+          { count: items.length },
+          () => `来源 ${items.length}`,
+        ),
+        h(SourcesContent, {}, () =>
+          items.map((item, index) =>
+            h(
+              Source,
+              {
+                key: item.key ?? item.url ?? index,
+                href: item.url || '#',
+                title: item.title || item.url || `来源 ${index + 1}`,
+              },
+              () => item.title || item.url || `来源 ${index + 1}`,
             ),
+          ),
         ),
       ]);
     };
@@ -157,7 +169,12 @@ export const Actions = defineComponent({
               variant: 'ghost',
               onClick: item.onItemClick,
             },
-            () => (item.actionRender ? item.actionRender() : item.icon ? h(VNodeRenderer, { node: item.icon }) : item.label),
+            () =>
+              item.actionRender
+                ? item.actionRender()
+                : item.icon
+                  ? h(VNodeRenderer, { node: item.icon })
+                  : item.label,
           ),
         ),
       );

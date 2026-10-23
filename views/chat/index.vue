@@ -113,7 +113,6 @@ const {
 
 const { executeAttachmentDownloads } = useChatAttachmentDownloads();
 
-
 const {
   abort: abortTransientRequest,
   detachAll,
@@ -786,7 +785,10 @@ async function finalizeChatRequest(params: {
       params.regenerateMessageId === undefined &&
       params.editingMessageIndex === undefined
     ) {
-      writePromptDraft(params.requestConversationId, params.submittedPromptText);
+      writePromptDraft(
+        params.requestConversationId,
+        params.submittedPromptText,
+      );
       if (stillViewing) {
         prompt.value = params.submittedPromptText;
       }
@@ -979,9 +981,9 @@ const messageListItems = computed(() => {
     items.push({
       content: isEditing
         ? getMessageTextContent(message)
-          : renderChatMessageContent(message, {
-              isDark: isDark.value,
-            }),
+        : renderChatMessageContent(message, {
+            isDark: isDark.value,
+          }),
       extraInfo: {
         message,
       },
@@ -1058,8 +1060,8 @@ const canClearMessages = computed(() => {
 const canCreateNewConversation = computed(() => {
   return Boolean(
     activeConversationId.value ||
-      activeMessages.value.length > 0 ||
-      transientMessages.value.length > 0,
+    activeMessages.value.length > 0 ||
+    transientMessages.value.length > 0,
   );
 });
 

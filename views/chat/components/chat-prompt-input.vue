@@ -42,7 +42,8 @@ interface ChatPromptInputProps {
 
 const props = defineProps<ChatPromptInputProps>();
 
-const accept = 'image/*,audio/*,video/*,.csv,.doc,.docx,.json,.md,.pdf,.txt,.xlsx';
+const accept =
+  'image/*,audio/*,video/*,.csv,.doc,.docx,.json,.md,.pdf,.txt,.xlsx';
 const expanded = ref(false);
 
 function parseDataUrl(url?: string) {
@@ -60,7 +61,11 @@ function toSubmitAttachments(files: any[]): AIChatComposerAttachment[] {
   return files.map((item) => {
     const parsed = parseDataUrl(item.url);
     const name = item.filename || item.file?.name || 'attachment';
-    const mimeType = parsed?.mimeType || item.mediaType || item.file?.type || 'application/octet-stream';
+    const mimeType =
+      parsed?.mimeType ||
+      item.mediaType ||
+      item.file?.type ||
+      'application/octet-stream';
     return {
       data: parsed?.data || item.url || '',
       file_type: inferAIChatAttachmentType(name, mimeType),
@@ -75,7 +80,12 @@ function toSubmitAttachments(files: any[]): AIChatComposerAttachment[] {
 
 async function handlePromptSubmit(payload: { files: any[]; text: string }) {
   const attachments = toSubmitAttachments(payload.files || []);
-  return await props.onSubmit?.(payload.text, undefined, undefined, attachments);
+  return await props.onSubmit?.(
+    payload.text,
+    undefined,
+    undefined,
+    attachments,
+  );
 }
 
 function handlePromptError(error: { message: string }) {

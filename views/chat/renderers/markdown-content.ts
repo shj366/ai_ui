@@ -177,10 +177,14 @@ function renderMarkdownSafetyNotice(content: string) {
           content: content.slice(0, 1200),
         })
       : null,
-    h('div', { class: 'inline-flex items-center gap-2 text-xs text-muted-foreground' }, [
-      h(Loader, { size: 14 }),
-      '正在接收图片或大段内容，已暂停 Markdown 实时解析以避免浏览器卡死',
-    ]),
+    h(
+      'div',
+      { class: 'inline-flex items-center gap-2 text-xs text-muted-foreground' },
+      [
+        h(Loader, { size: 14 }),
+        '正在接收图片或大段内容，已暂停 Markdown 实时解析以避免浏览器卡死',
+      ],
+    ),
   ]);
 }
 
@@ -212,10 +216,14 @@ function buildMarkdownContentRenderer(isDark = false) {
 
         const payload = getSafeMarkdownPayload(content);
         const sourceItems = normalizeInlineSourceItems(props.sourceItems ?? []);
-        const normalizedContent = linkSourceReferences(payload.content, sourceItems);
+        const normalizedContent = linkSourceReferences(
+          payload.content,
+          sourceItems,
+        );
         const children = [
           h(MessageResponse, {
-            class: 'ai-elements-markdown min-w-0 max-w-full text-sm leading-6 text-foreground',
+            class:
+              'ai-elements-markdown min-w-0 max-w-full text-sm leading-6 text-foreground',
             content: normalizedContent,
           }),
         ];
@@ -232,7 +240,11 @@ function buildMarkdownContentRenderer(isDark = false) {
 
         if (payload.truncated) {
           children.push(
-            h('div', { class: 'text-xs leading-5 text-muted-foreground' }, '内容过长，已截断以保持页面流畅'),
+            h(
+              'div',
+              { class: 'text-xs leading-5 text-muted-foreground' },
+              '内容过长，已截断以保持页面流畅',
+            ),
           );
         }
 

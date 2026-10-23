@@ -114,7 +114,11 @@ export interface PromptInputProps {
   onCancel?: () => void;
   onChange?: (value: string) => void;
   onKeyDown?: (event: KeyboardEvent) => void;
-  onSubmit?: (message: string, slotConfig?: unknown, skill?: unknown) => unknown;
+  onSubmit?: (
+    message: string,
+    slotConfig?: unknown,
+    skill?: unknown,
+  ) => unknown;
   placeholder?: string;
   value?: string;
 }

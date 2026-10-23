@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CommandDialog } from '#/plugins/ai/components/ui/command'
+import { CommandDialog } from '#/plugins/ai/components/ui/command';
 </script>
 
 <template>

@@ -1,50 +1,59 @@
 <script setup lang="ts">
-import type { BundledLanguage, ThemedToken } from 'shiki'
-import type { TokenizedCode } from './utils'
-import { cn } from '#/plugins/ai/lib/utils'
-import { computed, ref, watch } from 'vue'
-import { createRawTokens, highlightCode, isBold, isItalic, isUnderline } from './utils'
+import type { BundledLanguage, ThemedToken } from 'shiki';
+import type { TokenizedCode } from './utils';
+import { cn } from '#/plugins/ai/lib/utils';
+import { computed, ref, watch } from 'vue';
+import {
+  createRawTokens,
+  highlightCode,
+  isBold,
+  isItalic,
+  isUnderline,
+} from './utils';
 
 const props = withDefaults(
   defineProps<{
-    code: string
-    language: BundledLanguage
-    showLineNumbers?: boolean
+    code: string;
+    language: BundledLanguage;
+    showLineNumbers?: boolean;
   }>(),
   {
     showLineNumbers: false,
   },
-)
+);
 
-const rawTokens = computed(() => createRawTokens(props.code))
+const rawTokens = computed(() => createRawTokens(props.code));
 // Try to get cached result synchronously, otherwise use raw tokens
-const tokenized = ref<TokenizedCode>(highlightCode(props.code, props.language) ?? rawTokens.value)
+const tokenized = ref<TokenizedCode>(
+  highlightCode(props.code, props.language) ?? rawTokens.value,
+);
 
 watch(
   () => [props.code, props.language],
   () => {
     // Reset to raw tokens or cached result
-    tokenized.value = highlightCode(props.code, props.language) ?? rawTokens.value
+    tokenized.value =
+      highlightCode(props.code, props.language) ?? rawTokens.value;
     // Trigger async highlight
     highlightCode(props.code, props.language, (result) => {
-      tokenized.value = result
-    })
+      tokenized.value = result;
+    });
   },
   { immediate: true },
-)
+);
 
 const preStyle = computed(() => ({
   backgroundColor: tokenized.value.bg,
   color: tokenized.value.fg,
-}))
+}));
 
 interface KeyedToken {
-  token: ThemedToken
-  key: string
+  token: ThemedToken;
+  key: string;
 }
 interface KeyedLine {
-  tokens: KeyedToken[]
-  key: string
+  tokens: KeyedToken[];
+  key: string;
 }
 
 const keyedLines = computed<KeyedLine[]>(() =>
@@ -55,7 +64,7 @@ const keyedLines = computed<KeyedLine[]>(() =>
       key: `line-${lineIdx}-${tokenIdx}`,
     })),
   })),
-)
+);
 
 const lineNumberClasses = cn(
   'block',
@@ -68,13 +77,17 @@ const lineNumberClasses = cn(
   'before:text-muted-foreground/50',
   'before:font-mono',
   'before:select-none',
-)
+);
 </script>
 
 <template>
   <div class="relative overflow-auto">
     <pre
-      :class="cn('dark:bg-(--shiki-dark-bg)! dark:text-(--shiki-dark)! m-0 p-4 text-sm')"
+      :class="
+        cn(
+          'dark:bg-(--shiki-dark-bg)! dark:text-(--shiki-dark)! m-0 p-4 text-sm',
+        )
+      "
       :style="preStyle"
     ><code
         :class="cn(

@@ -57,7 +57,9 @@ export function useChatScroll(options: UseChatScrollOptions = {}) {
       return Math.abs(container.scrollTop);
     }
 
-    return container.scrollHeight - container.scrollTop - container.clientHeight;
+    return (
+      container.scrollHeight - container.scrollTop - container.clientHeight
+    );
   }
 
   function getScrollDirection(container: HTMLElement) {
@@ -81,7 +83,10 @@ export function useChatScroll(options: UseChatScrollOptions = {}) {
   }
 
   function applyMessageContainerRef(nextElement: HTMLElement | undefined) {
-    if (messageContainerRef.value && messageContainerRef.value !== nextElement) {
+    if (
+      messageContainerRef.value &&
+      messageContainerRef.value !== nextElement
+    ) {
       saveScrollAnchor(true, boundScrollKey);
     }
 

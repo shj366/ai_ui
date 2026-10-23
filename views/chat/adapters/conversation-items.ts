@@ -74,13 +74,7 @@ function formatYearMonth(date: Date) {
   return `${date.getFullYear()}-${month}`;
 }
 
-const CONVERSATION_GROUP_ORDER = [
-  '置顶',
-  '今天',
-  '昨天',
-  '7 天内',
-  '30 天内',
-];
+const CONVERSATION_GROUP_ORDER = ['置顶', '今天', '昨天', '7 天内', '30 天内'];
 
 function getConversationGroup(conversation: AIChatConversationResult) {
   if (conversation.is_pinned) {

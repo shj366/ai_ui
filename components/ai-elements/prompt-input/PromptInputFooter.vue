@@ -1,15 +1,16 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
-import { InputGroupAddon } from '#/plugins/ai/components/ui/input-group'
-import { cn } from '#/plugins/ai/lib/utils'
+import type { HTMLAttributes } from 'vue';
+import { InputGroupAddon } from '#/plugins/ai/components/ui/input-group';
+import { cn } from '#/plugins/ai/lib/utils';
 
-type PromptInputFooterProps = InstanceType<typeof InputGroupAddon>['$props']
+type PromptInputFooterProps = InstanceType<typeof InputGroupAddon>['$props'];
 
-interface Props extends /* @vue-ignore */ Omit<PromptInputFooterProps, 'align'> {
-  class?: HTMLAttributes['class']
+interface Props
+  extends /* @vue-ignore */ Omit<PromptInputFooterProps, 'align'> {
+  class?: HTMLAttributes['class'];
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 </script>
 
 <template>

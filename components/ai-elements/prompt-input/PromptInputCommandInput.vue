@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
-import { CommandInput } from '#/plugins/ai/components/ui/command'
-import { cn } from '#/plugins/ai/lib/utils'
+import type { HTMLAttributes } from 'vue';
+import { CommandInput } from '#/plugins/ai/components/ui/command';
+import { cn } from '#/plugins/ai/lib/utils';
 
-type PromptInputCommandInputProps = InstanceType<typeof CommandInput>['$props']
+type PromptInputCommandInputProps = InstanceType<typeof CommandInput>['$props'];
 
 interface Props extends /* @vue-ignore */ PromptInputCommandInputProps {
-  class?: HTMLAttributes['class']
+  class?: HTMLAttributes['class'];
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 </script>
 
 <template>

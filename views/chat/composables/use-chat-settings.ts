@@ -22,7 +22,9 @@ export function useChatSettings(options: UseChatSettingsOptions) {
     selectedModelId,
     selectedProviderId,
   } = options;
-  const conversationSessionConfigs = ref<Record<string, ChatSessionModelConfig>>({});
+  const conversationSessionConfigs = ref<
+    Record<string, ChatSessionModelConfig>
+  >({});
 
   function rememberConversationSessionConfig(conversationId?: null | string) {
     if (!conversationId) {
@@ -49,14 +51,18 @@ export function useChatSettings(options: UseChatSettingsOptions) {
     if (!conversationId) {
       return;
     }
-    applyConversationModelConfig(conversationSessionConfigs.value[conversationId]);
+    applyConversationModelConfig(
+      conversationSessionConfigs.value[conversationId],
+    );
   });
 
   watch(activeConversationDetail, (detail) => {
     if (!detail) {
       return;
     }
-    applyConversationModelConfig(conversationSessionConfigs.value[detail.conversation_id]);
+    applyConversationModelConfig(
+      conversationSessionConfigs.value[detail.conversation_id],
+    );
   });
 
   return { rememberConversationSessionConfig };

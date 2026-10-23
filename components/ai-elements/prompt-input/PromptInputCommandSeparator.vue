@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
-import { CommandSeparator } from '#/plugins/ai/components/ui/command'
-import { cn } from '#/plugins/ai/lib/utils'
+import type { HTMLAttributes } from 'vue';
+import { CommandSeparator } from '#/plugins/ai/components/ui/command';
+import { cn } from '#/plugins/ai/lib/utils';
 
-type PromptInputCommandSeparatorProps = InstanceType<typeof CommandSeparator>['$props']
+type PromptInputCommandSeparatorProps = InstanceType<
+  typeof CommandSeparator
+>['$props'];
 
 interface Props extends /* @vue-ignore */ PromptInputCommandSeparatorProps {
-  class?: HTMLAttributes['class']
+  class?: HTMLAttributes['class'];
 }
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 </script>
 
 <template>

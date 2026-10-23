@@ -99,7 +99,10 @@ export const ChatTaskItem = defineComponent({
         'div',
         {
           ...attrs,
-          class: cn('min-w-0 text-sm text-muted-foreground leading-6', props.class),
+          class: cn(
+            'min-w-0 text-sm text-muted-foreground leading-6',
+            props.class,
+          ),
         },
         slots.default?.(),
       );
@@ -167,7 +170,8 @@ export const ChatTaskTrigger = defineComponent({
                     h(IconifyIcon, {
                       class: cn(
                         'size-4 shrink-0 text-muted-foreground',
-                        props.status === 'active' && 'animate-spin text-primary',
+                        props.status === 'active' &&
+                          'animate-spin text-primary',
                         props.status === 'error' && 'text-amber-500',
                       ),
                       icon: getStatusIcon(props.status),
@@ -177,7 +181,10 @@ export const ChatTaskTrigger = defineComponent({
                       props.description
                         ? h(
                             'p',
-                            { class: 'truncate text-muted-foreground/80 text-xs' },
+                            {
+                              class:
+                                'truncate text-muted-foreground/80 text-xs',
+                            },
                             props.description,
                           )
                         : null,

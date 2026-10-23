@@ -1,33 +1,33 @@
 <script setup lang="ts">
-import type { DynamicToolUIPart, ToolUIPart } from 'ai'
-import type { HTMLAttributes } from 'vue'
-import { cn } from '#/plugins/ai/lib/utils'
-import { computed, isVNode } from 'vue'
-import { CodeBlock } from '../code-block'
+import type { DynamicToolUIPart, ToolUIPart } from 'ai';
+import type { HTMLAttributes } from 'vue';
+import { cn } from '#/plugins/ai/lib/utils';
+import { computed, isVNode } from 'vue';
+import { CodeBlock } from '../code-block';
 
-export type ToolPart = ToolUIPart | DynamicToolUIPart
+export type ToolPart = ToolUIPart | DynamicToolUIPart;
 
 interface Props extends /* @vue-ignore */ HTMLAttributes {
-  output: ToolPart['output']
-  errorText: ToolPart['errorText']
-  class?: HTMLAttributes['class']
+  output: ToolPart['output'];
+  errorText: ToolPart['errorText'];
+  class?: HTMLAttributes['class'];
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 
-const showOutput = computed(() => props.output || props.errorText)
+const showOutput = computed(() => props.output || props.errorText);
 
 const isObjectOutput = computed(
   () => typeof props.output === 'object' && !isVNode(props.output),
-)
-const isStringOutput = computed(() => typeof props.output === 'string')
+);
+const isStringOutput = computed(() => typeof props.output === 'string');
 
 const formattedOutput = computed(() => {
   if (isObjectOutput.value) {
-    return JSON.stringify(props.output, null, 2)
+    return JSON.stringify(props.output, null, 2);
   }
-  return props.output as string
-})
+  return props.output as string;
+});
 </script>
 
 <template>
@@ -39,7 +39,7 @@ const formattedOutput = computed(() => {
     <h4
       class="font-medium text-muted-foreground text-xs uppercase tracking-wide"
     >
-      {{ props.errorText ? "Error" : "Result" }}
+      {{ props.errorText ? 'Error' : 'Result' }}
     </h4>
     <div
       :class="

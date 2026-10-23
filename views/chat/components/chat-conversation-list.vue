@@ -104,7 +104,10 @@ function setDraft(item: ChatMessageListItem, value: string) {
   };
 }
 
-function syncEditableTextareaHeight(element: HTMLTextAreaElement, value: string) {
+function syncEditableTextareaHeight(
+  element: HTMLTextAreaElement,
+  value: string,
+) {
   Object.assign(element.style, getEditableTextareaStyle(value));
 }
 
@@ -122,8 +125,10 @@ function renderLoading() {
     { class: 'inline-flex items-center gap-2 text-muted-foreground' },
     [
       h(Loader, { class: 'text-muted-foreground/80', size: 14 }),
-      h(Shimmer, { as: 'span', class: 'text-sm', duration: 1.6 }, () =>
-        '正在回复...',
+      h(
+        Shimmer,
+        { as: 'span', class: 'text-sm', duration: 1.6 },
+        () => '正在回复...',
       ),
     ],
   );
@@ -137,7 +142,10 @@ function getEditableTextareaStyle(value: string) {
   const normalizedValue = value || '';
   const lineCount = normalizedValue
     .split('\n')
-    .reduce((total, line) => total + Math.max(1, Math.ceil(line.length / 64)), 0);
+    .reduce(
+      (total, line) => total + Math.max(1, Math.ceil(line.length / 64)),
+      0,
+    );
   const rows = Math.min(10, Math.max(2, lineCount));
 
   return {
@@ -293,8 +301,8 @@ function renderMessage(item: ChatMessageListItem) {
   const showFooterByDefault = getItemKey(item) === latestMessageActionKey.value;
   const editing = Boolean(
     config.editable &&
-      typeof config.editable === 'object' &&
-      config.editable.editing,
+    typeof config.editable === 'object' &&
+    config.editable.editing,
   );
 
   return h(
@@ -302,9 +310,7 @@ function renderMessage(item: ChatMessageListItem) {
     {
       key: item.key,
       class: cn(
-        editing
-          ? 'w-full !max-w-[min(820px,92%)]'
-          : 'max-w-[min(920px,92%)]',
+        editing ? 'w-full !max-w-[min(820px,92%)]' : 'max-w-[min(920px,92%)]',
         config.classes?.root,
       ),
       from: isUser ? 'user' : 'assistant',

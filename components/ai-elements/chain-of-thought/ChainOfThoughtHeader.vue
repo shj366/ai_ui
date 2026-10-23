@@ -35,10 +35,7 @@ const { isOpen, setIsOpen } = useChainOfThought();
       </span>
       <ChevronDownIcon
         :class="
-          cn(
-            'size-4 transition-transform',
-            isOpen ? 'rotate-180' : 'rotate-0',
-          )
+          cn('size-4 transition-transform', isOpen ? 'rotate-180' : 'rotate-0')
         "
       />
     </CollapsibleTrigger>

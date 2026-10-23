@@ -318,9 +318,7 @@ function getMessageProviderDisplayName(
   message: ChatMessageItem,
   options: Pick<
     CreateChatMessageListRoleOptions,
-    | 'getProviderLabel'
-    | 'selectedProviderId'
-    | 'selectedProviderLabel'
+    'getProviderLabel' | 'selectedProviderId' | 'selectedProviderLabel'
   >,
 ) {
   if (message.role !== 'assistant') {
@@ -1328,10 +1326,12 @@ function isProcessFoldLoading(
     return false;
   }
 
-  return blockIndexes.some((index) => {
-    const block = message.blocks[index];
-    return block?.type === 'event' && block.status === 'running';
-  }) || isThinkingActive(message);
+  return (
+    blockIndexes.some((index) => {
+      const block = message.blocks[index];
+      return block?.type === 'event' && block.status === 'running';
+    }) || isThinkingActive(message)
+  );
 }
 
 function renderProcessFold(
@@ -1549,9 +1549,7 @@ function getMessageActionItems(
   message: ChatMessageItem,
   options: Pick<
     CreateChatMessageListRoleOptions,
-    | 'canResendLastUserMessage'
-    | 'onBeginEditMessage'
-    | 'onConfirmDeleteMessage'
+    'canResendLastUserMessage' | 'onBeginEditMessage' | 'onConfirmDeleteMessage'
   >,
 ): ActionsProps['items'] {
   const items: ActionsProps['items'] = [
@@ -1588,9 +1586,7 @@ function renderMessageFooter(
   message: ChatMessageItem,
   options: Pick<
     CreateChatMessageListRoleOptions,
-    | 'canResendLastUserMessage'
-    | 'onBeginEditMessage'
-    | 'onConfirmDeleteMessage'
+    'canResendLastUserMessage' | 'onBeginEditMessage' | 'onConfirmDeleteMessage'
   >,
 ) {
   return h(Actions, {
@@ -1649,8 +1645,7 @@ export function createChatMessageListRole(
         footer: renderMessageFooter(message, options),
         footerPlacement: 'outer-end',
         onEditCancel: options.onCancelEditMessage,
-        onEditConfirm: (value) =>
-          options.onResendEditedMessage(String(value)),
+        onEditConfirm: (value) => options.onResendEditedMessage(String(value)),
         onEditResend: (value) => options.onResendEditedMessage(String(value)),
         placement: 'end',
         shape: 'default',

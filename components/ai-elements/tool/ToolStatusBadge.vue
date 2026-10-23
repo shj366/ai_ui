@@ -1,21 +1,21 @@
 <!-- StatusBadge.vue -->
 <script setup lang="ts">
-import type { DynamicToolUIPart, ToolUIPart } from 'ai'
-import type { Component } from 'vue'
+import type { DynamicToolUIPart, ToolUIPart } from 'ai';
+import type { Component } from 'vue';
 import {
   CheckCircleIcon,
   CircleIcon,
   ClockIcon,
   XCircleIcon,
-} from '@lucide/vue'
-import { Badge } from '#/plugins/ai/components/ui/badge'
-import { computed } from 'vue'
+} from '@lucide/vue';
+import { Badge } from '#/plugins/ai/components/ui/badge';
+import { computed } from 'vue';
 
-export type ToolPart = ToolUIPart | DynamicToolUIPart
+export type ToolPart = ToolUIPart | DynamicToolUIPart;
 
 const props = defineProps<{
-  state: ToolPart['state']
-}>()
+  state: ToolPart['state'];
+}>();
 
 const label = computed(() => {
   const labels: Record<ToolPart['state'], string> = {
@@ -26,9 +26,9 @@ const label = computed(() => {
     'output-available': '已完成',
     'output-error': '错误',
     'output-denied': '已拒绝',
-  }
-  return labels[props.state]
-})
+  };
+  return labels[props.state];
+});
 
 const icon = computed<Component>(() => {
   const icons: Record<ToolPart['state'], Component> = {
@@ -39,9 +39,9 @@ const icon = computed<Component>(() => {
     'output-available': CheckCircleIcon,
     'output-error': XCircleIcon,
     'output-denied': XCircleIcon,
-  }
-  return icons[props.state]
-})
+  };
+  return icons[props.state];
+});
 
 const iconClass = computed(() => {
   const classes: Record<ToolPart['state'], string> = {
@@ -52,9 +52,9 @@ const iconClass = computed(() => {
     'output-available': 'size-4 text-green-600',
     'output-error': 'size-4 text-red-600',
     'output-denied': 'size-4 text-orange-600',
-  }
-  return classes[props.state]
-})
+  };
+  return classes[props.state];
+});
 </script>
 
 <template>

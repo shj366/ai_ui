@@ -1,36 +1,37 @@
 <script setup lang="ts">
-import type { DynamicToolUIPart, ToolUIPart } from 'ai'
-import type { HTMLAttributes } from 'vue'
-import { ChevronDownIcon, WrenchIcon } from '@lucide/vue'
-import { CollapsibleTrigger } from '#/plugins/ai/components/ui/collapsible'
-import { cn } from '#/plugins/ai/lib/utils'
-import { computed } from 'vue'
-import StatusBadge from './ToolStatusBadge.vue'
+import type { DynamicToolUIPart, ToolUIPart } from 'ai';
+import type { HTMLAttributes } from 'vue';
+import { ChevronDownIcon, WrenchIcon } from '@lucide/vue';
+import { CollapsibleTrigger } from '#/plugins/ai/components/ui/collapsible';
+import { cn } from '#/plugins/ai/lib/utils';
+import { computed } from 'vue';
+import StatusBadge from './ToolStatusBadge.vue';
 
 type ToolHeaderProps = {
-  title?: string
-  class?: HTMLAttributes['class']
+  title?: string;
+  class?: HTMLAttributes['class'];
 } & (
-  | { type: ToolUIPart['type'], state: ToolUIPart['state'], toolName?: never }
-  | { type: DynamicToolUIPart['type'], state: DynamicToolUIPart['state'], toolName: string }
-)
+  | { type: ToolUIPart['type']; state: ToolUIPart['state']; toolName?: never }
+  | {
+      type: DynamicToolUIPart['type'];
+      state: DynamicToolUIPart['state'];
+      toolName: string;
+    }
+);
 
-const props = defineProps<ToolHeaderProps>()
+const props = defineProps<ToolHeaderProps>();
 
 const derivedName = computed(() =>
   props.type === 'dynamic-tool'
     ? props.toolName
     : props.type.split('-').slice(1).join('-'),
-)
+);
 </script>
 
 <template>
   <CollapsibleTrigger
     :class="
-      cn(
-        'flex w-full items-center justify-between gap-4 p-3',
-        props.class,
-      )
+      cn('flex w-full items-center justify-between gap-4 p-3', props.class)
     "
     v-bind="$attrs"
   >

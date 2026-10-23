@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CommandList } from '#/plugins/ai/components/ui/command'
+import { CommandList } from '#/plugins/ai/components/ui/command';
 </script>
 
 <template>

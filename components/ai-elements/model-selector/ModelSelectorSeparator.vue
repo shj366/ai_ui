@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CommandSeparator } from '#/plugins/ai/components/ui/command'
+import { CommandSeparator } from '#/plugins/ai/components/ui/command';
 </script>
 
 <template>

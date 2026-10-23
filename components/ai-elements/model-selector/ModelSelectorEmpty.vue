@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CommandEmpty } from '#/plugins/ai/components/ui/command'
+import { CommandEmpty } from '#/plugins/ai/components/ui/command';
 </script>
 
 <template>

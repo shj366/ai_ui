@@ -1,19 +1,16 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
-import { cn } from '#/plugins/ai/lib/utils'
+import type { HTMLAttributes } from 'vue';
+import { cn } from '#/plugins/ai/lib/utils';
 
 interface Props {
-  class?: HTMLAttributes['class']
+  class?: HTMLAttributes['class'];
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 </script>
 
 <template>
-  <div
-    :class="cn('flex items-center gap-1', props.class)"
-    v-bind="$attrs"
-  >
+  <div :class="cn('flex items-center gap-1', props.class)" v-bind="$attrs">
     <slot />
   </div>
 </template>

@@ -1,22 +1,22 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
-import type { AttachmentVariant } from './types'
-import { cn } from '#/plugins/ai/lib/utils'
-import { computed, provide } from 'vue'
-import { AttachmentsKey } from './context'
+import type { HTMLAttributes } from 'vue';
+import type { AttachmentVariant } from './types';
+import { cn } from '#/plugins/ai/lib/utils';
+import { computed, provide } from 'vue';
+import { AttachmentsKey } from './context';
 
 interface Props extends /* @vue-ignore */ HTMLAttributes {
-  variant?: AttachmentVariant
-  class?: HTMLAttributes['class']
+  variant?: AttachmentVariant;
+  class?: HTMLAttributes['class'];
 }
 
 const props = withDefaults(defineProps<Props>(), {
   variant: 'grid',
-})
+});
 
-const variant = computed(() => props.variant)
+const variant = computed(() => props.variant);
 
-provide(AttachmentsKey, { variant })
+provide(AttachmentsKey, { variant });
 </script>
 
 <template>

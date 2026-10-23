@@ -64,7 +64,10 @@ export function usePromptToolbar(options: UsePromptToolbarOptions) {
     }
     return h(
       'div',
-      { class: 'flex max-h-[min(320px,60vh)] w-[280px] flex-col gap-1 overflow-y-auto' },
+      {
+        class:
+          'flex max-h-[min(320px,60vh)] w-[280px] flex-col gap-1 overflow-y-auto',
+      },
       quickPhrases.value.map((item) =>
         h(
           aButton,

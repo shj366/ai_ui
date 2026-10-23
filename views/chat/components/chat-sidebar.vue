@@ -85,23 +85,34 @@ function selectItem(item: ConversationSidebarItem) {
     <div ref="scrollContainerRef" class="min-h-0 flex-1 overflow-y-auto p-3">
       <a-spin v-if="loading && items.length === 0" class="block py-10" />
       <template v-else>
-        <div v-if="items.length === 0" class="py-10 text-center text-sm text-muted-foreground">
+        <div
+          v-if="items.length === 0"
+          class="py-10 text-center text-sm text-muted-foreground"
+        >
           暂无话题
         </div>
-        <div v-for="group in groupedItems" :key="group.group" class="not-first:mt-4">
-          <div class="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">
+        <div
+          v-for="group in groupedItems"
+          :key="group.group"
+          class="not-first:mt-4"
+        >
+          <div
+            class="mb-1.5 px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80"
+          >
             {{ group.group }}
           </div>
           <div class="flex flex-col gap-1">
             <div
               v-for="item in group.items"
               :key="item.key"
-              :class="cn(
-                'group/item relative flex min-w-0 items-center rounded-xl px-3 py-2 pr-11 text-left transition',
-                activeKey === item.key
-                  ? 'bg-accent/80 text-foreground'
-                  : 'text-foreground hover:bg-accent/55',
-              )"
+              :class="
+                cn(
+                  'group/item relative flex min-w-0 items-center rounded-xl px-3 py-2 pr-11 text-left transition',
+                  activeKey === item.key
+                    ? 'bg-accent/80 text-foreground'
+                    : 'text-foreground hover:bg-accent/55',
+                )
+              "
             >
               <span
                 v-if="item.isGenerating"
@@ -122,8 +133,14 @@ function selectItem(item: ConversationSidebarItem) {
                 <a-popover placement="rightTop" trigger="click">
                   <template #content>
                     <div class="w-36 py-1">
-                      <template v-for="menuItem in menu(item)" :key="menuItem.key">
-                        <a-divider v-if="menuItem.type === 'divider'" class="!my-1" />
+                      <template
+                        v-for="menuItem in menu(item)"
+                        :key="menuItem.key"
+                      >
+                        <a-divider
+                          v-if="menuItem.type === 'divider'"
+                          class="!my-1"
+                        />
                         <a-button
                           v-else
                           block

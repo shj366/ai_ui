@@ -1,20 +1,23 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
-import type { ScrollToBottomOptions } from 'vue-stick-to-bottom'
-import { cn } from '#/plugins/ai/lib/utils'
-import { reactiveOmit } from '@vueuse/core'
-import { onBeforeUnmount, ref, watch } from 'vue'
-import { StickToBottom } from 'vue-stick-to-bottom'
+import type { HTMLAttributes } from 'vue';
+import type { ScrollToBottomOptions } from 'vue-stick-to-bottom';
+import { cn } from '#/plugins/ai/lib/utils';
+import { reactiveOmit } from '@vueuse/core';
+import { onBeforeUnmount, ref, watch } from 'vue';
+import { StickToBottom } from 'vue-stick-to-bottom';
 
 interface Props {
-  ariaLabel?: string
-  class?: HTMLAttributes['class']
-  initial?: boolean | 'instant' | { damping?: number, stiffness?: number, mass?: number }
-  resize?: 'instant' | { damping?: number, stiffness?: number, mass?: number }
-  damping?: number
-  stiffness?: number
-  mass?: number
-  anchor?: 'auto' | 'none'
+  ariaLabel?: string;
+  class?: HTMLAttributes['class'];
+  initial?:
+    | boolean
+    | 'instant'
+    | { damping?: number; stiffness?: number; mass?: number };
+  resize?: 'instant' | { damping?: number; stiffness?: number; mass?: number };
+  damping?: number;
+  stiffness?: number;
+  mass?: number;
+  anchor?: 'auto' | 'none';
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -24,62 +27,62 @@ const props = withDefaults(defineProps<Props>(), {
   stiffness: 0.05,
   mass: 1.25,
   anchor: 'none',
-})
+});
 const emit = defineEmits<{
-  scroll: [event: Event]
-}>()
-const delegatedProps = reactiveOmit(props, 'ariaLabel', 'class')
-const stickToBottomRef = ref<InstanceType<typeof StickToBottom>>()
-const scrollAreaClass = 'ai-conversation-scroll-area'
-let removeScrollListener: (() => void) | undefined
-let boundScrollElement: HTMLElement | undefined
+  scroll: [event: Event];
+}>();
+const delegatedProps = reactiveOmit(props, 'ariaLabel', 'class');
+const stickToBottomRef = ref<InstanceType<typeof StickToBottom>>();
+const scrollAreaClass = 'ai-conversation-scroll-area';
+let removeScrollListener: (() => void) | undefined;
+let boundScrollElement: HTMLElement | undefined;
 
 function getExposedValue<T>(key: string) {
-  const value = (stickToBottomRef.value as any)?.[key]
-  return (value?.value ?? value) as T | undefined
+  const value = (stickToBottomRef.value as any)?.[key];
+  return (value?.value ?? value) as T | undefined;
 }
 
 function getScrollElement() {
-  return getExposedValue<HTMLElement>('scrollRef')
+  return getExposedValue<HTMLElement>('scrollRef');
 }
 
 function handleScroll(event: Event) {
-  emit('scroll', event)
+  emit('scroll', event);
 }
 
 function cleanupScrollListener() {
-  removeScrollListener?.()
-  removeScrollListener = undefined
-  boundScrollElement?.classList.remove(scrollAreaClass)
-  boundScrollElement = undefined
+  removeScrollListener?.();
+  removeScrollListener = undefined;
+  boundScrollElement?.classList.remove(scrollAreaClass);
+  boundScrollElement = undefined;
 }
 
 function bindScrollListener(element?: HTMLElement) {
-  cleanupScrollListener()
+  cleanupScrollListener();
   if (!element) {
-    return
+    return;
   }
 
-  element.addEventListener('scroll', handleScroll, { passive: true })
-  element.classList.add(scrollAreaClass)
-  boundScrollElement = element
+  element.addEventListener('scroll', handleScroll, { passive: true });
+  element.classList.add(scrollAreaClass);
+  boundScrollElement = element;
   removeScrollListener = () => {
-    element.removeEventListener('scroll', handleScroll)
-  }
+    element.removeEventListener('scroll', handleScroll);
+  };
 }
 
-watch(getScrollElement, bindScrollListener, { flush: 'post' })
+watch(getScrollElement, bindScrollListener, { flush: 'post' });
 
-onBeforeUnmount(cleanupScrollListener)
+onBeforeUnmount(cleanupScrollListener);
 
 defineExpose({
   get scrollBoxNativeElement() {
-    return getScrollElement()
+    return getScrollElement();
   },
   scrollToBottom(options?: ScrollToBottomOptions) {
-    return (stickToBottomRef.value as any)?.scrollToBottom?.(options)
+    return (stickToBottomRef.value as any)?.scrollToBottom?.(options);
   },
-})
+});
 </script>
 
 <template>
@@ -87,7 +90,12 @@ defineExpose({
     ref="stickToBottomRef"
     v-bind="delegatedProps"
     :aria-label="props.ariaLabel"
-    :class="cn('ai-conversation-scroll relative flex-1 overflow-y-hidden', props.class)"
+    :class="
+      cn(
+        'ai-conversation-scroll relative flex-1 overflow-y-hidden',
+        props.class,
+      )
+    "
     role="log"
   >
     <slot />
@@ -128,8 +136,10 @@ defineExpose({
   border-radius: 999px;
 }
 
-.ai-conversation-scroll:hover .ai-conversation-scroll-area::-webkit-scrollbar-thumb,
-.ai-conversation-scroll:focus-within .ai-conversation-scroll-area::-webkit-scrollbar-thumb {
+.ai-conversation-scroll:hover
+  .ai-conversation-scroll-area::-webkit-scrollbar-thumb,
+.ai-conversation-scroll:focus-within
+  .ai-conversation-scroll-area::-webkit-scrollbar-thumb {
   background-color: hsl(var(--border) / 0.75);
 }
 

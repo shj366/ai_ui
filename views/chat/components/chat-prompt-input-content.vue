@@ -123,8 +123,7 @@ const defaultSubmitNode = computed<VNodeChild>(() =>
         PromptInputButton,
         {
           'aria-label': '停止',
-          class:
-            'ai-prompt-stop-button !h-9 !w-9 !rounded-xl !px-0 !shadow-sm',
+          class: 'ai-prompt-stop-button !h-9 !w-9 !rounded-xl !px-0 !shadow-sm',
           title: '停止',
           type: 'button',
           variant: 'destructive',
@@ -145,13 +144,12 @@ const defaultSubmitNode = computed<VNodeChild>(() =>
             'ai-prompt-submit-button !h-9 !w-9 !rounded-xl !bg-primary !px-0 !text-primary-foreground !shadow-sm hover:!bg-primary/90 disabled:!bg-muted disabled:!text-muted-foreground disabled:!opacity-100',
           disabled:
             props.disabled ||
-            (!context.textInput.value.trim() && context.files.value.length === 0),
+            (!context.textInput.value.trim() &&
+              context.files.value.length === 0),
           status: 'ready',
           title: '发送',
         },
-        () => [
-          h(IconifyIcon, { class: 'size-[18px]', icon: 'mdi:arrow-up' }),
-        ],
+        () => [h(IconifyIcon, { class: 'size-[18px]', icon: 'mdi:arrow-up' })],
       ),
 );
 
@@ -190,7 +188,10 @@ const footerNode = computed(() => {
       >
         <AttachmentPreview class="!size-6 !rounded-lg !bg-background/80" />
         <AttachmentInfo class="max-w-40" />
-        <AttachmentRemove class="opacity-70 hover:opacity-100" label="移除附件" />
+        <AttachmentRemove
+          class="opacity-70 hover:opacity-100"
+          label="移除附件"
+        />
       </Attachment>
     </Attachments>
   </PromptInputHeader>

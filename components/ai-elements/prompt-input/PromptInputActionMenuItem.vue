@@ -1,15 +1,17 @@
 <script setup lang="ts">
-import type { HTMLAttributes } from 'vue'
-import { DropdownMenuItem } from '#/plugins/ai/components/ui/dropdown-menu'
-import { cn } from '#/plugins/ai/lib/utils'
+import type { HTMLAttributes } from 'vue';
+import { DropdownMenuItem } from '#/plugins/ai/components/ui/dropdown-menu';
+import { cn } from '#/plugins/ai/lib/utils';
 
-type PromptInputActionMenuItemProps = InstanceType<typeof DropdownMenuItem>['$props']
+type PromptInputActionMenuItemProps = InstanceType<
+  typeof DropdownMenuItem
+>['$props'];
 
 interface Props extends /* @vue-ignore */ PromptInputActionMenuItemProps {
-  class?: HTMLAttributes['class']
+  class?: HTMLAttributes['class'];
 }
 
-const props = defineProps<Props>()
+const props = defineProps<Props>();
 </script>
 
 <template>

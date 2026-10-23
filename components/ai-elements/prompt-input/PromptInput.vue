@@ -1,45 +1,49 @@
 <script setup lang="ts">
-import type { ComponentPublicInstance, HTMLAttributes } from 'vue'
-import type { PromptInputMessage } from './types'
-import { InputGroup } from '#/plugins/ai/components/ui/input-group'
-import { cn } from '#/plugins/ai/lib/utils'
-import { getCurrentInstance, inject, onMounted, onUnmounted } from 'vue'
-import { usePromptInputProvider } from './context'
-import { PROMPT_INPUT_KEY } from './types'
+import type { ComponentPublicInstance, HTMLAttributes } from 'vue';
+import type { PromptInputMessage } from './types';
+import { InputGroup } from '#/plugins/ai/components/ui/input-group';
+import { cn } from '#/plugins/ai/lib/utils';
+import { getCurrentInstance, inject, onMounted, onUnmounted } from 'vue';
+import { usePromptInputProvider } from './context';
+import { PROMPT_INPUT_KEY } from './types';
 
 const props = defineProps<{
-  class?: HTMLAttributes['class']
-  accept?: string
-  multiple?: boolean
-  globalDrop?: boolean
-  maxFiles?: number
-  maxFileSize?: number
-  initialInput?: string
-}>()
+  class?: HTMLAttributes['class'];
+  accept?: string;
+  multiple?: boolean;
+  globalDrop?: boolean;
+  maxFiles?: number;
+  maxFileSize?: number;
+  initialInput?: string;
+}>();
 
 const emit = defineEmits<{
-  (e: 'submit', payload: PromptInputMessage): void
-  (e: 'error', payload: { code: string, message: string }): void
-}>()
+  (e: 'submit', payload: PromptInputMessage): void;
+  (e: 'error', payload: { code: string; message: string }): void;
+}>();
 
-const instance = getCurrentInstance()
+const instance = getCurrentInstance();
 
 function getListener(name: 'onSubmit' | 'onError') {
-  return instance?.vnode.props?.[name]
+  return instance?.vnode.props?.[name];
 }
 
 function callListener<T>(listener: unknown, payload: T) {
   if (Array.isArray(listener)) {
-    return Promise.all(listener.map(fn => typeof fn === 'function' ? fn(payload) : undefined))
+    return Promise.all(
+      listener.map((fn) =>
+        typeof fn === 'function' ? fn(payload) : undefined,
+      ),
+    );
   }
 
   if (typeof listener === 'function') {
-    return listener(payload)
+    return listener(payload);
   }
 }
 
 // --- Dual-mode context handling ---
-const inheritedContext = inject(PROMPT_INPUT_KEY, null)
+const inheritedContext = inject(PROMPT_INPUT_KEY, null);
 const localContext = inheritedContext
   ? null
   : usePromptInputProvider({
@@ -48,77 +52,76 @@ const localContext = inheritedContext
       maxFileSize: props.maxFileSize,
       accept: props.accept,
       onSubmit: (msg) => {
-        const listener = getListener('onSubmit')
-        if (listener)
-          return callListener(listener, msg)
+        const listener = getListener('onSubmit');
+        if (listener) return callListener(listener, msg);
 
-        emit('submit', msg)
+        emit('submit', msg);
       },
       onError: (err) => {
-        const listener = getListener('onError')
+        const listener = getListener('onError');
         if (listener) {
           void Promise.resolve(callListener(listener, err)).catch((error) => {
-            console.error('PromptInput onError listener failed:', error)
-          })
-          return
+            console.error('PromptInput onError listener failed:', error);
+          });
+          return;
         }
 
-        emit('error', err)
+        emit('error', err);
       },
-    })
+    });
 
-const context = inheritedContext || localContext
+const context = inheritedContext || localContext;
 
 if (!context) {
-  throw new Error('PromptInput context is missing.')
+  throw new Error('PromptInput context is missing.');
 }
 
-const { fileInputRef, addFiles, submitForm } = context
+const { fileInputRef, addFiles, submitForm } = context;
 
 function setFileInputRef(el: Element | ComponentPublicInstance | null) {
-  fileInputRef.value = el as HTMLInputElement | null
+  fileInputRef.value = el as HTMLInputElement | null;
 }
 
 function handleDragOver(e: DragEvent) {
   if (e.dataTransfer?.types?.includes('Files')) {
-    e.preventDefault()
+    e.preventDefault();
   }
 }
 
 function handleDrop(e: DragEvent) {
   if (e.dataTransfer?.types?.includes('Files')) {
-    e.preventDefault()
+    e.preventDefault();
   }
   if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-    addFiles(e.dataTransfer.files)
+    addFiles(e.dataTransfer.files);
   }
 }
 
 onMounted(() => {
   if (props.globalDrop) {
-    document.addEventListener('dragover', handleDragOver)
-    document.addEventListener('drop', handleDrop)
+    document.addEventListener('dragover', handleDragOver);
+    document.addEventListener('drop', handleDrop);
   }
-})
+});
 
 onUnmounted(() => {
   if (props.globalDrop) {
-    document.removeEventListener('dragover', handleDragOver)
-    document.removeEventListener('drop', handleDrop)
+    document.removeEventListener('dragover', handleDragOver);
+    document.removeEventListener('drop', handleDrop);
   }
-})
+});
 
 function onFileChange(e: Event) {
-  const input = e.target as HTMLInputElement
+  const input = e.target as HTMLInputElement;
   if (input.files) {
-    addFiles(input.files)
+    addFiles(input.files);
   }
-  input.value = ''
+  input.value = '';
 }
 
 function onSubmit(e: Event) {
-  e.preventDefault()
-  submitForm()
+  e.preventDefault();
+  submitForm();
 }
 </script>
 
@@ -131,7 +134,7 @@ function onSubmit(e: Event) {
       :accept="accept"
       :multiple="multiple"
       @change="onFileChange"
-    >
+    />
     <form
       :class="cn('w-full', props.class)"
       @submit="onSubmit"
