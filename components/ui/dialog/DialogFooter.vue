@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { DialogClose } from 'reka-ui';
-import { cn } from '#/plugins/ai/lib/utils';
+
 import { Button } from '#/plugins/ai/components/ui/button';
+import { cn } from '#/plugins/ai/lib/utils';
 
 const props = withDefaults(
   defineProps<{
@@ -10,6 +12,7 @@ const props = withDefaults(
     showCloseButton?: boolean;
   }>(),
   {
+    class: undefined,
     showCloseButton: false,
   },
 );
@@ -22,7 +25,7 @@ const props = withDefaults(
       cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', props.class)
     "
   >
-    <slot />
+    <slot></slot>
     <DialogClose v-if="showCloseButton" as-child>
       <Button variant="outline"> Close </Button>
     </DialogClose>

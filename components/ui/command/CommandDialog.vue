@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { DialogRootEmits, DialogRootProps } from 'reka-ui';
+
 import { useForwardPropsEmits } from 'reka-ui';
+
 import {
   Dialog,
   DialogContent,
@@ -8,13 +10,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '#/plugins/ai/components/ui/dialog';
+
 import Command from './Command.vue';
 
 const props = withDefaults(
   defineProps<
     DialogRootProps & {
-      title?: string;
       description?: string;
+      title?: string;
     }
   >(),
   {
@@ -35,7 +38,7 @@ const forwarded = useForwardPropsEmits(props, emits);
         <DialogDescription>{{ description }}</DialogDescription>
       </DialogHeader>
       <Command>
-        <slot v-bind="slotProps" />
+        <slot v-bind="slotProps"></slot>
       </Command>
     </DialogContent>
   </Dialog>

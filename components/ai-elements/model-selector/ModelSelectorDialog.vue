@@ -4,6 +4,6 @@ import { CommandDialog } from '#/plugins/ai/components/ui/command';
 
 <template>
   <CommandDialog v-bind="$attrs">
-    <slot />
+    <slot></slot>
   </CommandDialog>
 </template>

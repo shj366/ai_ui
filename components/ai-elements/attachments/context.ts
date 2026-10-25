@@ -1,9 +1,11 @@
 import type { InjectionKey, Ref } from 'vue';
+
 import type {
   AttachmentData,
   AttachmentMediaCategory,
   AttachmentVariant,
 } from './types';
+
 import { computed, inject } from 'vue';
 
 export interface AttachmentsContextValue {

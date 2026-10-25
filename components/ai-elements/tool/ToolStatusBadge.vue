@@ -1,17 +1,21 @@
 <!-- StatusBadge.vue -->
 <script setup lang="ts">
 import type { DynamicToolUIPart, ToolUIPart } from 'ai';
+
 import type { Component } from 'vue';
+
+import { computed } from 'vue';
+
 import {
   CheckCircleIcon,
   CircleIcon,
   ClockIcon,
   XCircleIcon,
 } from '@lucide/vue';
-import { Badge } from '#/plugins/ai/components/ui/badge';
-import { computed } from 'vue';
 
-export type ToolPart = ToolUIPart | DynamicToolUIPart;
+import { Badge } from '#/plugins/ai/components/ui/badge';
+
+export type ToolPart = DynamicToolUIPart | ToolUIPart;
 
 const props = defineProps<{
   state: ToolPart['state'];

@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import type { DropdownMenuSubTriggerProps } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
 import { ChevronRight } from '@lucide/vue';
 import { reactiveOmit } from '@vueuse/core';
 import { DropdownMenuSubTrigger, useForwardProps } from 'reka-ui';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<
@@ -29,7 +32,7 @@ const forwardedProps = useForwardProps(delegatedProps);
       )
     "
   >
-    <slot />
+    <slot></slot>
     <ChevronRight class="ml-auto size-4" />
   </DropdownMenuSubTrigger>
 </template>

@@ -91,13 +91,10 @@ export function createMessageProcessFoldPlan(
       ({ block, index }) =>
         block.type === 'reasoning' && index > lastToolBlockIndex,
     );
-  const mode = hasResult
-    ? 'with-result'
-    : message.streaming
-      ? 'streaming'
-      : hasTailReasoning
-        ? 'tail-reasoning'
-        : undefined;
+  let mode: 'streaming' | 'tail-reasoning' | 'with-result' | undefined;
+  if (hasResult) mode = 'with-result';
+  else if (message.streaming) mode = 'streaming';
+  else if (hasTailReasoning) mode = 'tail-reasoning';
 
   if (!mode) {
     return null;

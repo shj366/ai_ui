@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { ButtonVariants } from '#/plugins/ai/components/ui/button';
+
 import { Button } from '#/plugins/ai/components/ui/button';
 import {
   Tooltip,
@@ -16,6 +17,8 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  label: undefined,
+  tooltip: undefined,
   variant: 'ghost',
   size: 'icon-sm',
 });
@@ -32,7 +35,7 @@ const buttonProps = {
     <Tooltip>
       <TooltipTrigger as-child>
         <Button v-bind="{ ...buttonProps, ...$attrs }">
-          <slot />
+          <slot></slot>
           <span class="sr-only"> {{ props.label || props.tooltip }}</span>
         </Button>
       </TooltipTrigger>
@@ -43,7 +46,7 @@ const buttonProps = {
   </TooltipProvider>
 
   <Button v-else v-bind="{ ...buttonProps, ...$attrs }">
-    <slot />
+    <slot></slot>
     <span class="sr-only">{{ props.label || props.tooltip }}</span>
   </Button>
 </template>

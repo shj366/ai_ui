@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import type { HTMLAttributes, VNode } from 'vue';
+
 import type { AttachmentMediaCategory } from './types';
+
+import { computed } from 'vue';
+
 import {
   FileTextIcon,
   GlobeIcon,
@@ -9,8 +13,9 @@ import {
   PaperclipIcon,
   VideoIcon,
 } from '@lucide/vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
-import { computed } from 'vue';
+
 import { useAttachmentContext } from './context';
 
 interface Props extends /* @vue-ignore */ HTMLAttributes {
@@ -86,7 +91,7 @@ const imageAlt = computed(
       class="size-full object-cover"
       muted
       :src="fileUrl"
-    />
+    ></video>
     <component :is="props.fallbackIcon" v-else-if="props.fallbackIcon" />
     <component
       :is="iconComponent"

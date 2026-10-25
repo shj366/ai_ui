@@ -3,7 +3,9 @@ import type {
   DropdownMenuRadioItemEmits,
   DropdownMenuRadioItemProps,
 } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
 import { Circle } from '@lucide/vue';
 import { reactiveOmit } from '@vueuse/core';
 import {
@@ -11,6 +13,7 @@ import {
   DropdownMenuRadioItem,
   useForwardPropsEmits,
 } from 'reka-ui';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<
@@ -44,6 +47,6 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
         </slot>
       </DropdownMenuItemIndicator>
     </span>
-    <slot />
+    <slot></slot>
   </DropdownMenuRadioItem>
 </template>

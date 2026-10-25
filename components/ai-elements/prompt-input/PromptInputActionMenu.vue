@@ -10,6 +10,6 @@ const props = defineProps<Props>();
 
 <template>
   <DropdownMenu v-bind="props">
-    <slot />
+    <slot></slot>
   </DropdownMenu>
 </template>

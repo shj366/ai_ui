@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { CSSProperties, HTMLAttributes } from 'vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<{
@@ -25,6 +26,6 @@ const style: CSSProperties = {
     :style="style"
     v-bind="$attrs"
   >
-    <slot />
+    <slot></slot>
   </div>
 </template>

@@ -1,10 +1,11 @@
 <script setup lang="ts">
+import type { VNodeChild } from 'vue';
+
 import type {
   ChatMessageListItem,
   ChatMessageListProps,
   ChatMessageRoleRenderResult,
 } from './types';
-import type { VNodeChild } from 'vue';
 
 import { computed, h, ref } from 'vue';
 
@@ -21,6 +22,7 @@ import MessageContent from '#/plugins/ai/components/ai-elements/message/MessageC
 import MessageToolbar from '#/plugins/ai/components/ai-elements/message/MessageToolbar.vue';
 import Shimmer from '#/plugins/ai/components/ai-elements/shimmer/Shimmer.vue';
 import { cn } from '#/plugins/ai/lib/utils';
+
 import { VNodeRenderer } from './vnode-renderer';
 
 const props = withDefaults(
@@ -33,22 +35,26 @@ const props = withDefaults(
     role?: ChatMessageListProps['role'];
   }>(),
   {
+    class: undefined,
+    classes: undefined,
     items: () => [],
+    onScroll: undefined,
+    role: undefined,
   },
 );
 
 const conversationRef = ref<{
-  scrollToBottom?: (options?: unknown) => Promise<boolean> | boolean;
   scrollBoxNativeElement?: HTMLElement;
+  scrollToBottom?: (options?: unknown) => boolean | Promise<boolean>;
 }>();
 const editDrafts = ref<Record<string, string>>({});
 
 const conversationClass = computed(() =>
-  cn('h-full min-h-0 max-h-full', props.class),
+  cn('h-full max-h-full min-h-0', props.class),
 );
 const contentClass = computed(() =>
   cn(
-    'min-h-full justify-end gap-9 px-3 pb-8 pt-4 sm:px-5 md:pt-6',
+    'min-h-full justify-end gap-9 px-3 pt-4 pb-8 sm:px-5 md:pt-6',
     props.classes?.scroll,
   ),
 );
@@ -138,8 +144,7 @@ function getDraft(item: ChatMessageListItem) {
   return editDrafts.value[getItemKey(item)] ?? '';
 }
 
-function getEditableTextareaStyle(value: string) {
-  const normalizedValue = value || '';
+function getEditableTextareaStyle(normalizedValue: string = '') {
   const lineCount = normalizedValue
     .split('\n')
     .reduce(
@@ -285,10 +290,10 @@ function renderMessageAvatar(item: ChatMessageListItem) {
   return h(MessageAvatar, {
     class: cn(
       'mt-0.5 size-9 rounded-lg border shadow-sm ring-0',
-      '[&_[data-slot=avatar-fallback]]:!rounded-lg [&_[data-slot=avatar-fallback]]:text-xs [&_[data-slot=avatar-fallback]]:font-semibold',
+      '**:data-[slot=avatar-fallback]:rounded-lg! **:data-[slot=avatar-fallback]:text-xs **:data-[slot=avatar-fallback]:font-semibold',
       isUser
-        ? 'border-border/70 bg-secondary text-foreground [&_[data-slot=avatar-fallback]]:bg-secondary [&_[data-slot=avatar-fallback]]:text-foreground'
-        : 'border-primary/20 bg-primary/10 text-primary [&_[data-slot=avatar-fallback]]:bg-primary/10 [&_[data-slot=avatar-fallback]]:text-primary',
+        ? '[&_[data-slot=avatar-fallback]]:bg-secondary [&_[data-slot=avatar-fallback]]:text-foreground bg-secondary border-border/70 text-foreground'
+        : '[&_[data-slot=avatar-fallback]]:bg-primary/10 [&_[data-slot=avatar-fallback]]:text-primary bg-primary/10 border-primary/20 text-primary',
     ),
     name: isUser ? '我' : 'AI',
     src: '',
@@ -304,19 +309,24 @@ function renderMessage(item: ChatMessageListItem) {
     typeof config.editable === 'object' &&
     config.editable.editing,
   );
+  const messageContent = (() => {
+    if (editing) return renderEditable(item, config);
+    if (config.loading) return renderLoading();
+    return h(VNodeRenderer, { node: item.content });
+  })();
 
   return h(
     Message,
     {
       key: item.key,
       class: cn(
-        editing ? 'w-full !max-w-[min(820px,92%)]' : 'max-w-[min(920px,92%)]',
+        editing ? 'w-full max-w-[min(820px,92%)]!' : 'max-w-[min(920px,92%)]',
         config.classes?.root,
       ),
       from: isUser ? 'user' : 'assistant',
     },
     () => [
-      !isUser ? renderMessageAvatar(item) : null,
+      isUser ? null : renderMessageAvatar(item),
       h(
         'div',
         {
@@ -337,17 +347,11 @@ function renderMessage(item: ChatMessageListItem) {
             {
               class: cn(
                 'min-w-0',
-                editing && '!w-full !rounded-none !bg-transparent !p-0',
+                editing && 'w-full! rounded-none! bg-transparent! p-0!',
                 config.classes?.content,
               ),
             },
-            () => [
-              editing
-                ? renderEditable(item, config)
-                : config.loading
-                  ? renderLoading()
-                  : h(VNodeRenderer, { node: item.content }),
-            ],
+            () => [messageContent],
           ),
           config.footer && !editing
             ? h('div', {
@@ -364,7 +368,7 @@ function renderMessage(item: ChatMessageListItem) {
                     isUser ? 'right-0 justify-end' : 'left-0 justify-start',
                     showFooterByDefault
                       ? 'pointer-events-auto opacity-100'
-                      : 'pointer-events-none opacity-0 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100',
+                      : 'pointer-events-none opacity-0 group-focus-within:pointer-events-auto group-focus-within:opacity-100 group-hover:pointer-events-auto group-hover:opacity-100',
                   ),
                 },
                 () => [config.footer],
@@ -411,7 +415,11 @@ defineExpose({
   >
     <ConversationContent :class="contentClass">
       <VNodeRenderer :node="renderedItems" />
-      <div aria-hidden="true" class="h-px w-full" data-chat-bottom-sentinel />
+      <div
+        aria-hidden="true"
+        class="h-px w-full"
+        data-chat-bottom-sentinel
+      ></div>
     </ConversationContent>
 
     <template #overlay>

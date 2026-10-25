@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import type { DynamicToolUIPart, ToolUIPart } from 'ai';
+
 import type { HTMLAttributes } from 'vue';
-import { cn } from '#/plugins/ai/lib/utils';
+
 import { computed } from 'vue';
+
+import { cn } from '#/plugins/ai/lib/utils';
+
 import { CodeBlock } from '../code-block';
 
-type ToolPart = ToolUIPart | DynamicToolUIPart;
+type ToolPart = DynamicToolUIPart | ToolUIPart;
 
 interface Props extends /* @vue-ignore */ HTMLAttributes {
   input: ToolPart['input'];

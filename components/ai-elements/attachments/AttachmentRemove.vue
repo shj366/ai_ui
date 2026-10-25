@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { XIcon } from '@lucide/vue';
+
 import { Button } from '#/plugins/ai/components/ui/button';
 import { cn } from '#/plugins/ai/lib/utils';
+
 import { useAttachmentContext } from './context';
 
 type ButtonProps = InstanceType<typeof Button>['$props'];
@@ -13,6 +16,7 @@ interface Props extends /* @vue-ignore */ ButtonProps {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  class: undefined,
   label: 'Remove',
 });
 

@@ -1,6 +1,6 @@
-import type { ActionsProps, FileCardProps, SourcesProps } from './types';
-
 import type { PropType } from 'vue';
+
+import type { ActionsProps, FileCardProps, SourcesProps } from './types';
 
 import { defineComponent, h } from 'vue';
 
@@ -18,17 +18,14 @@ import Source from '#/plugins/ai/components/ai-elements/sources/Source.vue';
 import AISources from '#/plugins/ai/components/ai-elements/sources/Sources.vue';
 import SourcesContent from '#/plugins/ai/components/ai-elements/sources/SourcesContent.vue';
 import SourcesTrigger from '#/plugins/ai/components/ai-elements/sources/SourcesTrigger.vue';
+
 import { VNodeRenderer } from './vnode-renderer';
 
 function toAttachmentData(item: FileCardProps, index: number) {
-  const fallbackMediaType =
-    item.type === 'image'
-      ? 'image/*'
-      : item.type === 'audio'
-        ? 'audio/*'
-        : item.type === 'video'
-          ? 'video/*'
-          : 'application/octet-stream';
+  let fallbackMediaType = 'application/octet-stream';
+  if (item.type === 'image') fallbackMediaType = 'image/*';
+  else if (item.type === 'audio') fallbackMediaType = 'audio/*';
+  else if (item.type === 'video') fallbackMediaType = 'video/*';
 
   return {
     filename: item.name || '附件',
@@ -169,12 +166,11 @@ export const Actions = defineComponent({
               variant: 'ghost',
               onClick: item.onItemClick,
             },
-            () =>
-              item.actionRender
-                ? item.actionRender()
-                : item.icon
-                  ? h(VNodeRenderer, { node: item.icon })
-                  : item.label,
+            () => {
+              if (item.actionRender) return item.actionRender();
+              if (item.icon) return h(VNodeRenderer, { node: item.icon });
+              return item.label;
+            },
           ),
         ),
       );

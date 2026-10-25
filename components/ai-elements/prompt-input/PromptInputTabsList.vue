@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 interface Props extends /* @vue-ignore */ HTMLAttributes {
@@ -11,6 +12,6 @@ const props = defineProps<Props>();
 
 <template>
   <div :class="cn(props.class)" v-bind="props">
-    <slot />
+    <slot></slot>
   </div>
 </template>

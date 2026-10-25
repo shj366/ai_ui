@@ -3,17 +3,20 @@ import type {
   PromptInputContext,
   PromptInputMessage,
 } from './types';
-import { nanoid } from 'nanoid';
+
 import { inject, onBeforeUnmount, provide, ref } from 'vue';
+
+import { nanoid } from 'nanoid';
+
 import { PROMPT_INPUT_KEY } from './types';
 
 export function usePromptInputProvider(props: {
+  accept?: string;
   initialInput?: string;
   maxFiles?: number;
   maxFileSize?: number;
-  accept?: string;
-  onSubmit?: (message: PromptInputMessage) => void | Promise<void>;
   onError?: (err: { code: string; message: string }) => void;
+  onSubmit?: (message: PromptInputMessage) => Promise<void> | void;
 }) {
   const textInput = ref(props.initialInput || '');
   const files = ref<AttachmentFile[]>([]);
@@ -27,7 +30,7 @@ export function usePromptInputProvider(props: {
   };
 
   const revokeObjectUrls = (items: AttachmentFile[]) => {
-    items.forEach(revokeObjectUrl);
+    items.forEach((item) => revokeObjectUrl(item));
   };
 
   // Cleanup object URLs to avoid memory leaks
@@ -66,11 +69,11 @@ export function usePromptInputProvider(props: {
   };
 
   const addFiles = (incoming: File[] | FileList) => {
-    const fileList = Array.from(incoming);
+    const fileList = [...incoming];
 
     // Validate Accept
-    const accepted = fileList.filter(matchesAccept);
-    if (fileList.length && accepted.length === 0) {
+    const accepted = fileList.filter((file) => matchesAccept(file));
+    if (fileList.length > 0 && accepted.length === 0) {
       props.onError?.({ code: 'accept', message: '没有符合类型要求的附件' });
       return;
     }
@@ -78,7 +81,7 @@ export function usePromptInputProvider(props: {
     // Validate Size
     const withinSize = (f: File) =>
       props.maxFileSize ? f.size <= props.maxFileSize : true;
-    const sized = accepted.filter(withinSize);
+    const sized = accepted.filter((file) => withinSize(file));
     if (accepted.length > 0 && sized.length === 0) {
       props.onError?.({ code: 'max_file_size', message: '附件大小超出限制' });
       return;
@@ -148,14 +151,18 @@ export function usePromptInputProvider(props: {
 
   const convertBlobUrlToDataUrl = async (
     url: string,
-  ): Promise<string | null> => {
+  ): Promise<null | string> => {
     try {
       const response = await fetch(url);
       const blob = await response.blob();
       return new Promise((resolve) => {
         const reader = new FileReader();
-        reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = () => resolve(null);
+        reader.addEventListener('loadend', () => {
+          resolve(reader.result as string);
+        });
+        reader.addEventListener('error', () => {
+          resolve(null);
+        });
         reader.readAsDataURL(blob);
       });
     } catch {
@@ -196,22 +203,22 @@ export function usePromptInputProvider(props: {
       await props.onSubmit(message);
 
       clearSubmittedFiles(submittedIds);
-    } catch (e) {
+    } catch (error) {
       if (textInput.value === '') {
         setTextInput(submittedText);
       }
 
       if (props.onError) {
         const errorMessage =
-          e instanceof Error
-            ? e.message
-            : String(e) || 'An unknown error occurred during submission.';
+          error instanceof Error
+            ? error.message
+            : String(error) || 'An unknown error occurred during submission.';
         props.onError({
           code: 'submit_error',
           message: errorMessage,
         });
       }
-      console.error('Submission failed:', e);
+      console.error('Submission failed:', error);
     } finally {
       isLoading.value = false;
     }

@@ -5,6 +5,7 @@ import type {
   AIProviderModelResult,
   AIProviderResult,
 } from '../../../api';
+import type { AIModelFormValues } from '../model-params';
 
 import type { VbenFormProps } from '#/adapter/form';
 import type {
@@ -35,7 +36,7 @@ import {
   updateAIModelApi,
 } from '../../../api';
 import { createModelSchema, queryModelSchema, useModelColumns } from '../data';
-import { createAIModelPayload, type AIModelFormValues } from '../model-params';
+import { createAIModelPayload } from '../model-params';
 
 const props = defineProps<{
   provider?: AIProviderResult;

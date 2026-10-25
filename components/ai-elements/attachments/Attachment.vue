@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import type { AttachmentData } from './types';
-import { cn } from '#/plugins/ai/lib/utils';
+
 import { computed, provide } from 'vue';
+
+import { cn } from '#/plugins/ai/lib/utils';
+
 import { AttachmentKey, useAttachmentsContext } from './context';
 import { getMediaCategory } from './utils';
 
@@ -54,6 +58,6 @@ provide(AttachmentKey, {
     "
     v-bind="$attrs"
   >
-    <slot />
+    <slot></slot>
   </div>
 </template>

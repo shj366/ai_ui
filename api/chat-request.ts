@@ -2,9 +2,9 @@ import type { InputContent } from '@ag-ui/core';
 
 import type { AIChatAttachmentType } from '../types/message';
 import type {
+  AIChatCompletionParams,
   AIChatComposerAttachment,
   AIChatComposerParams,
-  AIChatCompletionParams,
   AIChatForwardedPropsParams,
   AIChatRegenerateParams,
   BuildChatCompletionRequestInput,

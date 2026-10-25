@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { HoverCardContent } from '#/plugins/ai/components/ui/hover-card';
 import { cn } from '#/plugins/ai/lib/utils';
 
@@ -13,11 +14,12 @@ interface Props extends /* @vue-ignore */ AttachmentHoverCardContentProps {
 
 const props = withDefaults(defineProps<Props>(), {
   align: 'start',
+  class: undefined,
 });
 </script>
 
 <template>
   <HoverCardContent :class="cn('w-auto p-2', props.class)" v-bind="props">
-    <slot />
+    <slot></slot>
   </HoverCardContent>
 </template>

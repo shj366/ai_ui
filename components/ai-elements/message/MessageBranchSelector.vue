@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { UIMessage } from 'ai';
+
 import { ButtonGroup } from '#/plugins/ai/components/ui/button-group';
+
 import { useMessageBranchContext } from './context';
 
 interface Props {
@@ -18,6 +20,6 @@ const { totalBranches } = useMessageBranchContext();
     orientation="horizontal"
     v-bind="$attrs"
   >
-    <slot />
+    <slot></slot>
   </ButtonGroup>
 </template>

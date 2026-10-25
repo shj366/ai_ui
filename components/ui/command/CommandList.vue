@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { ListboxContentProps } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
 import { reactiveOmit } from '@vueuse/core';
 import { ListboxContent, useForwardProps } from 'reka-ui';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<
@@ -26,7 +29,7 @@ const forwarded = useForwardProps(delegatedProps);
     "
   >
     <div role="presentation">
-      <slot />
+      <slot></slot>
     </div>
   </ListboxContent>
 </template>

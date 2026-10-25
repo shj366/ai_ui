@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import type { PrimitiveProps } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
+import { computed } from 'vue';
+
 import { reactiveOmit } from '@vueuse/core';
 import { Primitive } from 'reka-ui';
-import { computed } from 'vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
+
 import { useCommand } from '.';
 
 const props = defineProps<
@@ -26,6 +31,6 @@ const isRender = computed(
     v-bind="delegatedProps"
     :class="cn('py-6 text-center text-sm', props.class)"
   >
-    <slot />
+    <slot></slot>
   </Primitive>
 </template>

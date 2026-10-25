@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { AvatarFallbackProps } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
 import { reactiveOmit } from '@vueuse/core';
 import { AvatarFallback } from 'reka-ui';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<
@@ -23,6 +26,6 @@ const delegatedProps = reactiveOmit(props, 'class');
       )
     "
   >
-    <slot />
+    <slot></slot>
   </AvatarFallback>
 </template>

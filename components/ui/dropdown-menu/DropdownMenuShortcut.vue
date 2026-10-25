@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<{
@@ -14,6 +15,6 @@ const props = defineProps<{
       cn('text-muted-foreground ml-auto text-xs tracking-widest', props.class)
     "
   >
-    <slot />
+    <slot></slot>
   </span>
 </template>

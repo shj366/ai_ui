@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { DropdownMenuLabelProps } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
 import { reactiveOmit } from '@vueuse/core';
 import { DropdownMenuLabel, useForwardProps } from 'reka-ui';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<
@@ -22,6 +25,6 @@ const forwardedProps = useForwardProps(delegatedProps);
       cn('px-2 py-1.5 text-sm font-medium data-[inset]:pl-8', props.class)
     "
   >
-    <slot />
+    <slot></slot>
   </DropdownMenuLabel>
 </template>

@@ -12,10 +12,10 @@ export const TOOL_APPROVAL_REQUEST_EVENT_TYPES = new Set([
   'TOOL_CALL_APPROVAL_REQUESTED',
 ]);
 export const TOOL_APPROVAL_RESPONSE_EVENT_TYPES = new Set([
-  'TOOL_APPROVAL_RESPONSE',
   'TOOL_APPROVAL_RESPONDED',
-  'TOOL_CALL_APPROVAL_RESPONSE',
+  'TOOL_APPROVAL_RESPONSE',
   'TOOL_CALL_APPROVAL_RESPONDED',
+  'TOOL_CALL_APPROVAL_RESPONSE',
 ]);
 export const TOOL_CALL_EVENT_TYPES = new Set([
   ...TOOL_APPROVAL_REQUEST_EVENT_TYPES,
@@ -125,17 +125,23 @@ function normalizeToolStateValue(value: unknown): ToolState | undefined {
   }
 
   switch (normalized) {
-    case 'approved':
-    case 'approval-response':
-    case 'approval-responded':
-    case 'tool-approval-response': {
-      return 'approval-responded';
-    }
     case 'approval-request':
     case 'approval-requested':
     case 'awaiting-approval':
     case 'tool-approval-request': {
       return 'approval-requested';
+    }
+    case 'approval-responded':
+    case 'approval-response':
+    case 'approved':
+    case 'tool-approval-response': {
+      return 'approval-responded';
+    }
+    case 'completed':
+    case 'succeeded':
+    case 'success':
+    case 'tool-output-available': {
+      return 'output-available';
     }
     case 'denied':
     case 'rejected':
@@ -147,23 +153,17 @@ function normalizeToolStateValue(value: unknown): ToolState | undefined {
     case 'tool-output-error': {
       return 'output-error';
     }
-    case 'completed':
-    case 'success':
-    case 'succeeded':
-    case 'tool-output-available': {
-      return 'output-available';
-    }
-    case 'input-ready':
-    case 'running':
-    case 'tool-input-available': {
-      return 'input-available';
-    }
     case 'input-delta':
     case 'input-stream':
     case 'pending':
     case 'streaming':
     case 'tool-input-start': {
       return 'input-streaming';
+    }
+    case 'input-ready':
+    case 'running':
+    case 'tool-input-available': {
+      return 'input-available';
     }
   }
 }

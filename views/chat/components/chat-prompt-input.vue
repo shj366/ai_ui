@@ -1,20 +1,23 @@
 <script setup lang="ts">
-import type { PromptInputFooterInfo } from './types';
 import type { VNodeChild } from 'vue';
 
 import type { AIChatComposerAttachment } from '../../../api/chat';
+import type { PromptInputFooterInfo } from './types';
 
 import { ref } from 'vue';
 
 import { message } from 'antdv-next';
 
-import { inferAIChatAttachmentType } from '../../../api/chat';
 import { PromptInput } from '#/plugins/ai/components/ai-elements';
+
+import { inferAIChatAttachmentType } from '../../../api/chat';
 import ChatPromptInputContent from './chat-prompt-input-content.vue';
 
 defineOptions({
   inheritAttrs: false,
 });
+
+const props = defineProps<ChatPromptInputProps>();
 
 type ChatPromptInputSubmit = (
   message: string,
@@ -26,9 +29,9 @@ type ChatPromptInputSubmit = (
 interface ChatPromptInputProps {
   disabled?: boolean;
   footer?:
+    | ((defaultNode: VNodeChild, info: PromptInputFooterInfo) => VNodeChild)
     | false
-    | VNodeChild
-    | ((defaultNode: VNodeChild, info: PromptInputFooterInfo) => VNodeChild);
+    | VNodeChild;
   loading?: boolean;
   name?: string;
   onCancel?: () => void;
@@ -39,8 +42,6 @@ interface ChatPromptInputProps {
   suffix?: boolean;
   value?: string;
 }
-
-const props = defineProps<ChatPromptInputProps>();
 
 const accept =
   'image/*,audio/*,video/*,.csv,.doc,.docx,.json,.md,.pdf,.txt,.xlsx';
@@ -72,14 +73,14 @@ function toSubmitAttachments(files: any[]): AIChatComposerAttachment[] {
       id: item.id,
       mime_type: mimeType,
       name,
-      size: item.file?.size || item.size || 0,
+      size: item.file?.size ?? item.size ?? 0,
       source_type: parsed ? 'base64' : 'url',
     };
   });
 }
 
 async function handlePromptSubmit(payload: { files: any[]; text: string }) {
-  const attachments = toSubmitAttachments(payload.files || []);
+  const attachments = toSubmitAttachments(payload.files ?? []);
   return await props.onSubmit?.(
     payload.text,
     undefined,

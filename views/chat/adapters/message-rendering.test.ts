@@ -52,7 +52,7 @@ const showVisibleEvent = (
   block: AIChatEventMessageBlock,
 ) => block.event_type !== 'TEXT_MESSAGE_START';
 
-describe('AI chat message rendering helpers', () => {
+describe('aI chat message rendering helpers', () => {
   it('only groups consecutive events from the same tool call', () => {
     const items = createMessageEventRenderItems([
       eventBlock('TOOL_CALL_START', {
@@ -92,7 +92,8 @@ describe('AI chat message rendering helpers', () => {
     const group = items[0]?.type === 'tool' ? items[0].group : undefined;
 
     expect(group).toBeDefined();
-    expect(getToolGroupState(group!)).toBe('output-available');
+    if (!group) throw new Error('Expected a tool group');
+    expect(getToolGroupState(group)).toBe('output-available');
   });
 
   it('does not add a process fold for plain text', () => {

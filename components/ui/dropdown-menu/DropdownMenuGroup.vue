@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { DropdownMenuGroupProps } from 'reka-ui';
+
 import { DropdownMenuGroup } from 'reka-ui';
 
 const props = defineProps<DropdownMenuGroupProps>();
@@ -7,6 +8,6 @@ const props = defineProps<DropdownMenuGroupProps>();
 
 <template>
   <DropdownMenuGroup data-slot="dropdown-menu-group" v-bind="props">
-    <slot />
+    <slot></slot>
   </DropdownMenuGroup>
 </template>

@@ -1,4 +1,5 @@
 import type { InjectionKey, Ref, VNode } from 'vue';
+
 import { inject } from 'vue';
 
 export interface MessageBranchContextType<T = VNode[]> {

@@ -28,7 +28,7 @@ const { isOpen } = useChainOfThought();
       "
       v-bind="$attrs"
     >
-      <slot />
+      <slot></slot>
     </CollapsibleContent>
   </Collapsible>
 </template>

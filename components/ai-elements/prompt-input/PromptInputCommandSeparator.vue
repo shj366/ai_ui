@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { CommandSeparator } from '#/plugins/ai/components/ui/command';
 import { cn } from '#/plugins/ai/lib/utils';
 

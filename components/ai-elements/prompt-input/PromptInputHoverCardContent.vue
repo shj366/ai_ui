@@ -16,6 +16,6 @@ const { align, ...restProps } = props;
 
 <template>
   <HoverCardContent :align="props.align" v-bind="restProps">
-    <slot />
+    <slot></slot>
   </HoverCardContent>
 </template>

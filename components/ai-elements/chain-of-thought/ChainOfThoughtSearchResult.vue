@@ -15,6 +15,6 @@ const props = defineProps<{
     variant="secondary"
     v-bind="$attrs"
   >
-    <slot />
+    <slot></slot>
   </Badge>
 </template>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { AvatarRoot } from 'reka-ui';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<{
@@ -18,6 +20,6 @@ const props = defineProps<{
       )
     "
   >
-    <slot />
+    <slot></slot>
   </AvatarRoot>
 </template>

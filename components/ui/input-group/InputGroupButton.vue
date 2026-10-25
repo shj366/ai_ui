@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import type { InputGroupButtonVariants } from '.';
+
 import type { ButtonVariants } from '#/plugins/ai/components/ui/button';
-import { cn } from '#/plugins/ai/lib/utils';
+
 import { Button } from '#/plugins/ai/components/ui/button';
+import { cn } from '#/plugins/ai/lib/utils';
+
 import { inputGroupButtonVariants } from '.';
 
 interface InputGroupButtonProps {
@@ -13,6 +17,7 @@ interface InputGroupButtonProps {
 }
 
 const props = withDefaults(defineProps<InputGroupButtonProps>(), {
+  class: undefined,
   size: 'xs',
   variant: 'ghost',
 });
@@ -24,6 +29,6 @@ const props = withDefaults(defineProps<InputGroupButtonProps>(), {
     :variant="props.variant"
     :class="cn(inputGroupButtonVariants({ size: props.size }), props.class)"
   >
-    <slot />
+    <slot></slot>
   </Button>
 </template>

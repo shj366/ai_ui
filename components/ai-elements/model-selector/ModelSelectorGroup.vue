@@ -4,6 +4,6 @@ import { CommandGroup } from '#/plugins/ai/components/ui/command';
 
 <template>
   <CommandGroup v-bind="$attrs">
-    <slot />
+    <slot></slot>
   </CommandGroup>
 </template>

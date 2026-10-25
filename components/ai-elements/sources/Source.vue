@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { BookIcon } from '@lucide/vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<{
+  class?: HTMLAttributes['class'];
   href: string;
   title: string;
-  class?: HTMLAttributes['class'];
 }>();
 </script>
 

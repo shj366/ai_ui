@@ -1,20 +1,21 @@
+import type { Component, VNodeChild } from 'vue';
+
+import type { ChatMessageItem } from '../../../runtime/message';
+import type {
+  AIChatEventMessageBlock,
+  AIChatFileMessageBlock,
+} from '../../../types/message';
 import type {
   ActionsProps,
   ChatMessageListItem,
   ChatMessageListProps,
   SourcesProps,
 } from '../components';
-
-import type { Component, VNodeChild } from 'vue';
-
-import type { AttachmentData } from '#/plugins/ai/components/ai-elements/attachments/types';
-import type { ChatMessageItem } from '../../../runtime/message';
-import type {
-  AIChatEventMessageBlock,
-  AIChatFileMessageBlock,
-} from '../../../types/message';
 import type { MarkdownSourceItems } from '../renderers/markdown-content';
 import type { ToolEventGroup } from './message-event-groups';
+import type { MessageProcessFoldPlan } from './message-process-fold';
+
+import type { AttachmentData } from '#/plugins/ai/components/ai-elements/attachments/types';
 
 import { h } from 'vue';
 
@@ -40,15 +41,6 @@ import {
   ToolInput,
   ToolOutput,
 } from '#/plugins/ai/components/ai-elements';
-import {
-  Actions,
-  ChatTask,
-  ChatTaskContent,
-  ChatTaskItem,
-  ChatTaskTrigger,
-  Sources,
-  Think,
-} from '../components';
 
 import { resolveAIChatApiUrl } from '../../../api/chat';
 import {
@@ -58,6 +50,15 @@ import {
   normalizeAIChatFileBlock,
   parseDateLabel,
 } from '../../../runtime/message';
+import {
+  Actions,
+  ChatTask,
+  ChatTaskContent,
+  ChatTaskItem,
+  ChatTaskTrigger,
+  Sources,
+  Think,
+} from '../components';
 import { isHtmlPageCommand } from '../renderers/custom/html-page-card';
 import {
   createAIReplyMarkdownStreaming,
@@ -85,10 +86,7 @@ import {
   TOOL_CALL_RESULT_EVENT_TYPES,
   TOOL_OUTPUT_AVAILABLE_EVENT_TYPES,
 } from './message-event-groups';
-import {
-  createMessageProcessFoldPlan,
-  type MessageProcessFoldPlan,
-} from './message-process-fold';
+import { createMessageProcessFoldPlan } from './message-process-fold';
 
 void collectSourceItems;
 void renderInlineSourcePanel;
@@ -605,7 +603,9 @@ function renderMessageFiles(
   const key = options.key ?? 'files';
   const startIndex = options.startIndex ?? 0;
   const generatedImageFiles =
-    message.role === 'assistant' ? visibleFiles.filter(isImageFile) : [];
+    message.role === 'assistant'
+      ? visibleFiles.filter((file) => isImageFile(file))
+      : [];
   const attachmentFiles =
     message.role === 'assistant'
       ? visibleFiles.filter((file) => !isImageFile(file))

@@ -1,7 +1,8 @@
-import { ref, watch } from 'vue';
 import type { Ref } from 'vue';
 
 import type { AIChatConversationDetail } from '../../../api/chat';
+
+import { ref, watch } from 'vue';
 
 interface ChatSessionModelConfig {
   modelId?: string;

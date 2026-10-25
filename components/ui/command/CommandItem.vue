@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import type { ListboxItemEmits, ListboxItemProps } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
+import { computed, onMounted, onUnmounted, ref } from 'vue';
+
 import { reactiveOmit, useCurrentElement } from '@vueuse/core';
 import { ListboxItem, useForwardPropsEmits, useId } from 'reka-ui';
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
+
 import { useCommand, useCommandGroup } from '.';
 
 const props = defineProps<
@@ -21,9 +26,7 @@ const { filterState, allItems, allGroups } = useCommand();
 const groupContext = useCommandGroup();
 
 const isRender = computed(() => {
-  if (!filterState.search) {
-    return true;
-  } else {
+  if (filterState.search) {
     const filteredCurrentItem = filterState.filtered.items.get(id);
     // If the filtered items is undefined means not in the all times map yet
     // Do the first render to add into the map
@@ -34,25 +37,26 @@ const isRender = computed(() => {
     // Check with filter
     return filteredCurrentItem > 0;
   }
+  return true;
 });
 
 const itemRef = ref();
 const currentElement = useCurrentElement(itemRef);
 onMounted(() => {
-  if (!(currentElement.value instanceof HTMLElement)) return;
+  if (currentElement.value instanceof HTMLElement) {
+    // textValue to perform filter
+    allItems.value.set(
+      id,
+      currentElement.value.textContent ?? props.value?.toString() ?? '',
+    );
 
-  // textValue to perform filter
-  allItems.value.set(
-    id,
-    currentElement.value.textContent ?? props.value?.toString() ?? '',
-  );
-
-  const groupId = groupContext?.id;
-  if (groupId) {
-    if (!allGroups.value.has(groupId)) {
-      allGroups.value.set(groupId, new Set([id]));
-    } else {
-      allGroups.value.get(groupId)?.add(id);
+    const groupId = groupContext?.id;
+    if (groupId) {
+      if (allGroups.value.has(groupId)) {
+        allGroups.value.get(groupId)?.add(id);
+      } else {
+        allGroups.value.set(groupId, new Set([id]));
+      }
     }
   }
 });
@@ -80,6 +84,6 @@ onUnmounted(() => {
       }
     "
   >
-    <slot />
+    <slot></slot>
   </ListboxItem>
 </template>

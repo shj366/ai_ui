@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { PrimitiveProps } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
 import type { ButtonGroupVariants } from '.';
+
 import { Primitive } from 'reka-ui';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 interface Props extends PrimitiveProps {
@@ -11,7 +15,9 @@ interface Props extends PrimitiveProps {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  class: undefined,
   as: 'div',
+  orientation: undefined,
 });
 </script>
 
@@ -28,6 +34,6 @@ const props = withDefaults(defineProps<Props>(), {
       )
     "
   >
-    <slot />
+    <slot></slot>
   </Primitive>
 </template>

@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { HTMLAttributes, VNode } from 'vue';
+
 import type { MessageBranchContextType } from './context';
-import { cn } from '#/plugins/ai/lib/utils';
+
 import { provide, readonly, ref } from 'vue';
+
+import { cn } from '#/plugins/ai/lib/utils';
+
 import { MessageBranchKey } from './context';
 
 interface Props {
@@ -10,6 +14,7 @@ interface Props {
   class?: HTMLAttributes['class'];
 }
 const props = withDefaults(defineProps<Props>(), {
+  class: undefined,
   defaultBranch: 0,
 });
 
@@ -61,6 +66,6 @@ provide(MessageBranchKey, contextValue);
     :class="cn('grid w-full gap-2 [&>div]:pb-0', props.class)"
     v-bind="$attrs"
   >
-    <slot />
+    <slot></slot>
   </div>
 </template>

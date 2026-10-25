@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ImageIcon } from '@lucide/vue';
+
 import { DropdownMenuItem } from '#/plugins/ai/components/ui/dropdown-menu';
+
 import { usePromptInput } from './context';
 
 type PromptInputActionAddAttachmentsProps = InstanceType<

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { CommandGroup } from '#/plugins/ai/components/ui/command';
 import { cn } from '#/plugins/ai/lib/utils';
 
@@ -14,6 +15,6 @@ const props = defineProps<Props>();
 
 <template>
   <CommandGroup :class="cn(props.class)" v-bind="props">
-    <slot />
+    <slot></slot>
   </CommandGroup>
 </template>

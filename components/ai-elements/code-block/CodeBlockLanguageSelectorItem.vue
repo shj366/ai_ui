@@ -12,6 +12,6 @@ const props = defineProps<Props>();
 
 <template>
   <SelectItem v-bind="{ ...props, ...$attrs }">
-    <slot />
+    <slot></slot>
   </SelectItem>
 </template>

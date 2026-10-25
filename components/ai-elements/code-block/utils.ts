@@ -4,6 +4,7 @@ import type {
   HighlighterGeneric,
   ThemedToken,
 } from 'shiki';
+
 import { createHighlighter } from 'shiki';
 
 // Shiki uses bitflags for font styles: 1=italic, 2=bold, 4=underline
@@ -79,7 +80,7 @@ export function highlightCode(
   code: string,
   language: BundledLanguage,
   callback?: (result: TokenizedCode) => void,
-): TokenizedCode | null {
+): null | TokenizedCode {
   const tokensCacheKey = getTokensCacheKey(code, language);
 
   // Return cached result if available

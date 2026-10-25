@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
+import { computed, onBeforeUnmount, ref } from 'vue';
+
 import { CheckIcon, CopyIcon } from '@lucide/vue';
+import { reactiveOmit } from '@vueuse/core';
+
 import { Button } from '#/plugins/ai/components/ui/button';
 import { cn } from '#/plugins/ai/lib/utils';
-import { reactiveOmit } from '@vueuse/core';
-import { computed, onBeforeUnmount, ref } from 'vue';
+
 import { useCodeBlockContext } from './context';
 
 type CodeBlockCopyButtonProps = InstanceType<typeof Button>['$props'];
@@ -15,6 +19,7 @@ interface Props extends /* @vue-ignore */ CodeBlockCopyButtonProps {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  class: undefined,
   timeout: 2000,
 });
 

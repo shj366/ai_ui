@@ -1,4 +1,5 @@
 import type { FileUIPart } from 'ai';
+
 import type { Ref } from 'vue';
 
 export interface PromptInputMessage {

@@ -4,6 +4,6 @@ import { DialogTrigger } from '#/plugins/ai/components/ui/dialog';
 
 <template>
   <DialogTrigger v-bind="$attrs">
-    <slot />
+    <slot></slot>
   </DialogTrigger>
 </template>

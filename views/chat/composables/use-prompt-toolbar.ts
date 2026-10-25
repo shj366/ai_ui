@@ -1,15 +1,15 @@
-import type { PromptInputProps } from '../components';
-
 import type { Ref, VNodeChild } from 'vue';
 
 import type { AIQuickPhraseResult } from '../../../api';
+import type { PromptInputProps } from '../components';
 
 import { h, ref, resolveComponent } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 
-import { getAllAIQuickPhraseApi } from '../../../api';
 import { PromptInputButton } from '#/plugins/ai/components/ai-elements';
+
+import { getAllAIQuickPhraseApi } from '../../../api';
 
 type PromptInputFooterRender = Extract<
   NonNullable<PromptInputProps['footer']>,
@@ -91,8 +91,8 @@ export function usePromptToolbar(options: UsePromptToolbarOptions) {
   function renderIconButton(opts: {
     disabled?: boolean;
     icon: string;
-    title: string;
     onClick?: () => void;
+    title: string;
   }) {
     return h(
       PromptInputButton,

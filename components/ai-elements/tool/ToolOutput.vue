@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import type { DynamicToolUIPart, ToolUIPart } from 'ai';
+
 import type { HTMLAttributes } from 'vue';
-import { cn } from '#/plugins/ai/lib/utils';
+
 import { computed, isVNode } from 'vue';
+
+import { cn } from '#/plugins/ai/lib/utils';
+
 import { CodeBlock } from '../code-block';
 
-export type ToolPart = ToolUIPart | DynamicToolUIPart;
+export type ToolPart = DynamicToolUIPart | ToolUIPart;
 
 interface Props extends /* @vue-ignore */ HTMLAttributes {
   output: ToolPart['output'];

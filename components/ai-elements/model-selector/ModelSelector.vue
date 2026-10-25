@@ -4,6 +4,6 @@ import { Dialog } from '#/plugins/ai/components/ui/dialog';
 
 <template>
   <Dialog v-bind="$attrs">
-    <slot />
+    <slot></slot>
   </Dialog>
 </template>

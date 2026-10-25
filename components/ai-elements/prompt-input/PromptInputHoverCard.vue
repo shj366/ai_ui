@@ -22,6 +22,6 @@ const { openDelay, closeDelay, ...restProps } = props;
     :close-delay="closeDelay"
     v-bind="restProps"
   >
-    <slot />
+    <slot></slot>
   </HoverCard>
 </template>

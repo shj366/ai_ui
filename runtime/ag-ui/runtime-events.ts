@@ -84,7 +84,7 @@ function resolveCurrentToolCallId(
 }
 
 function resolveToolCallResultErrorText(event: ToolCallResultEvent) {
-  const value = event as ToolCallResultEvent & Record<string, unknown>;
+  const value = event as Record<string, unknown> & ToolCallResultEvent;
   const candidates = [value.error, value.errorText, value.error_text];
 
   for (const candidate of candidates) {

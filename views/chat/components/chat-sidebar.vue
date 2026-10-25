@@ -1,17 +1,18 @@
 <script setup lang="ts">
-import {
-  compareConversationGroups,
-  type ConversationSidebarCreation,
-  type ConversationSidebarItem,
-  type ConversationSidebarMenu,
+import type {
+  ConversationSidebarCreation,
+  ConversationSidebarItem,
+  ConversationSidebarMenu,
 } from '../adapters/conversation-items';
 
 import { computed, ref } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 import { cn } from '@vben/utils';
+
 import { useInfiniteScroll } from '@vueuse/core';
 
+import { compareConversationGroups } from '../adapters/conversation-items';
 import { VNodeRenderer } from './vnode-renderer';
 
 const props = defineProps<{
@@ -42,7 +43,7 @@ const groupedItems = computed(() => {
     groups.push({ group, items });
   }
 
-  return groups.sort((left, right) =>
+  return groups.toSorted((left, right) =>
     compareConversationGroups(left.group, right.group),
   );
 });
@@ -118,7 +119,7 @@ function selectItem(item: ConversationSidebarItem) {
                 v-if="item.isGenerating"
                 aria-hidden="true"
                 class="ai-conversation-generating-glow"
-              />
+              ></span>
               <button
                 class="min-w-0 flex-1 text-left"
                 :title="item.title"
@@ -184,14 +185,10 @@ function selectItem(item: ConversationSidebarItem) {
   position: absolute;
   inset: 0;
   z-index: 0;
+  padding: 1px;
   overflow: hidden;
   pointer-events: none;
   border-radius: inherit;
-  padding: 1px;
-  -webkit-mask:
-    linear-gradient(#000 0 0) content-box,
-    linear-gradient(#000 0 0);
-  -webkit-mask-composite: xor;
   mask:
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
@@ -205,7 +202,7 @@ function selectItem(item: ConversationSidebarItem) {
   background: conic-gradient(
     from 225deg,
     hsl(var(--primary)) 0deg,
-    hsl(var(--primary) / 0.45) 28deg,
+    hsl(var(--primary) / 45%) 28deg,
     transparent 82deg,
     transparent 360deg
   );

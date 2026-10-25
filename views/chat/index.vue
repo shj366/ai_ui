@@ -146,8 +146,7 @@ function writePromptDraft(conversationId: string | undefined, value: string) {
     if (!(key in promptDrafts.value)) {
       return;
     }
-    const nextDrafts = { ...promptDrafts.value };
-    delete nextDrafts[key];
+    const { [key]: _removedDraft, ...nextDrafts } = promptDrafts.value;
     promptDrafts.value = nextDrafts;
     return;
   }
@@ -1349,8 +1348,8 @@ onBeforeUnmount(() => {
 
 .ai-elements-markdown ul,
 .ai-elements-markdown ol {
-  margin: 0.35rem 0;
   padding-left: 1.25rem;
+  margin: 0.35rem 0;
 }
 
 .ai-elements-markdown li + li {
@@ -1358,26 +1357,26 @@ onBeforeUnmount(() => {
 }
 
 .ai-elements-markdown a {
-  color: hsl(var(--primary));
   font-weight: 500;
+  color: hsl(var(--primary));
   text-decoration: underline;
   text-underline-offset: 4px;
 }
 
 .ai-elements-markdown code {
-  border-radius: 0.375rem;
-  background: hsl(var(--muted));
   padding: 0.1rem 0.35rem;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 0.92em;
+  background: hsl(var(--muted));
+  border-radius: 0.375rem;
 }
 
 .ai-elements-markdown blockquote {
-  margin: 0.5rem 0;
-  border-left: 3px solid hsl(var(--primary) / 0.45);
-  background: hsl(var(--muted) / 0.35);
   padding: 0.5rem 0.75rem;
+  margin: 0.5rem 0;
   color: hsl(var(--muted-foreground));
+  background: hsl(var(--muted) / 35%);
+  border-left: 3px solid hsl(var(--primary) / 45%);
 }
 
 .ai-elements-markdown img {

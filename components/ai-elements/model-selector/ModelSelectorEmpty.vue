@@ -4,6 +4,6 @@ import { CommandEmpty } from '#/plugins/ai/components/ui/command';
 
 <template>
   <CommandEmpty v-bind="$attrs">
-    <slot />
+    <slot></slot>
   </CommandEmpty>
 </template>

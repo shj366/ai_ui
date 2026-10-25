@@ -1,20 +1,24 @@
 <script setup lang="ts">
 import type { ComponentPublicInstance, HTMLAttributes } from 'vue';
+
 import type { PromptInputMessage } from './types';
+
+import { getCurrentInstance, inject, onMounted, onUnmounted } from 'vue';
+
 import { InputGroup } from '#/plugins/ai/components/ui/input-group';
 import { cn } from '#/plugins/ai/lib/utils';
-import { getCurrentInstance, inject, onMounted, onUnmounted } from 'vue';
+
 import { usePromptInputProvider } from './context';
 import { PROMPT_INPUT_KEY } from './types';
 
 const props = defineProps<{
-  class?: HTMLAttributes['class'];
   accept?: string;
-  multiple?: boolean;
+  class?: HTMLAttributes['class'];
   globalDrop?: boolean;
+  initialInput?: string;
   maxFiles?: number;
   maxFileSize?: number;
-  initialInput?: string;
+  multiple?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -24,7 +28,7 @@ const emit = defineEmits<{
 
 const instance = getCurrentInstance();
 
-function getListener(name: 'onSubmit' | 'onError') {
+function getListener(name: 'onError' | 'onSubmit') {
   return instance?.vnode.props?.[name];
 }
 
@@ -78,7 +82,7 @@ if (!context) {
 
 const { fileInputRef, addFiles, submitForm } = context;
 
-function setFileInputRef(el: Element | ComponentPublicInstance | null) {
+function setFileInputRef(el: ComponentPublicInstance | Element | null) {
   fileInputRef.value = el as HTMLInputElement | null;
 }
 
@@ -142,7 +146,7 @@ function onSubmit(e: Event) {
       @drop.prevent.stop="handleDrop"
     >
       <InputGroup class="overflow-hidden">
-        <slot />
+        <slot></slot>
       </InputGroup>
     </form>
   </div>

@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
+import { computed, ref } from 'vue';
+
 import { InputGroupTextarea } from '#/plugins/ai/components/ui/input-group';
 import { cn } from '#/plugins/ai/lib/utils';
-import { computed, ref } from 'vue';
+
 import { usePromptInput } from './context';
 
 type PromptInputTextareaProps = InstanceType<
@@ -55,7 +58,7 @@ function handlePaste(e: ClipboardEvent) {
   if (!items) return;
 
   const pastedFiles: File[] = [];
-  for (const item of Array.from(items)) {
+  for (const item of [...items]) {
     if (item.kind === 'file') {
       const file = item.getAsFile();
       if (file) pastedFiles.push(file);

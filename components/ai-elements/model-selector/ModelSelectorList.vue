@@ -4,6 +4,6 @@ import { CommandList } from '#/plugins/ai/components/ui/command';
 
 <template>
   <CommandList v-bind="$attrs">
-    <slot />
+    <slot></slot>
   </CommandList>
 </template>

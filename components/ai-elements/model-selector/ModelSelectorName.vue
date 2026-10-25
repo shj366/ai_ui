@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 interface Props {
@@ -11,6 +12,6 @@ const props = defineProps<Props>();
 
 <template>
   <span :class="cn('flex-1 truncate text-left', props.class)" v-bind="$attrs">
-    <slot />
+    <slot></slot>
   </span>
 </template>

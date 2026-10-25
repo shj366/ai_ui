@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import type { HTMLAttributes, Ref } from 'vue';
 
-import { useVModel } from '@vueuse/core';
 import { provide } from 'vue';
+
+import { useVModel } from '@vueuse/core';
 
 import { cn } from '#/plugins/ai/lib/utils';
 
@@ -15,6 +16,7 @@ interface ChainOfThoughtProps {
 }
 
 const props = withDefaults(defineProps<ChainOfThoughtProps>(), {
+  class: undefined,
   defaultOpen: false,
   modelValue: undefined,
 });
@@ -36,6 +38,6 @@ provide(ChainOfThoughtContextKey, isOpen as Ref<boolean>);
     :class="cn('not-prose max-w-prose space-y-4', props.class)"
     v-bind="$attrs"
   >
-    <slot />
+    <slot></slot>
   </div>
 </template>

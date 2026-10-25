@@ -8,6 +8,6 @@ const props = defineProps<{
 
 <template>
   <CommandItem v-bind="$attrs" :value="props.value">
-    <slot />
+    <slot></slot>
   </CommandItem>
 </template>

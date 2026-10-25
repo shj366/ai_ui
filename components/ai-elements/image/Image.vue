@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { Experimental_GeneratedImage } from 'ai';
+
 import type { HTMLAttributes } from 'vue';
-import { cn } from '#/plugins/ai/lib/utils';
+
 import { computed } from 'vue';
+
+import { cn } from '#/plugins/ai/lib/utils';
 
 interface Props extends Partial<Experimental_GeneratedImage> {
   alt?: string;

@@ -15,6 +15,6 @@ const props = withDefaults(defineProps<Props>(), {
 
 <template>
   <SelectContent :align="props.align" v-bind="$attrs">
-    <slot />
+    <slot></slot>
   </SelectContent>
 </template>

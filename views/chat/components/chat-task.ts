@@ -3,6 +3,7 @@ import type { HTMLAttributes, PropType } from 'vue';
 import { defineComponent, h } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
+
 import { ChevronDownIcon } from '@radix-icons/vue';
 
 import {
@@ -99,10 +100,7 @@ export const ChatTaskItem = defineComponent({
         'div',
         {
           ...attrs,
-          class: cn(
-            'min-w-0 text-sm text-muted-foreground leading-6',
-            props.class,
-          ),
+          class: cn('text-muted-foreground min-w-0 text-sm/6', props.class),
         },
         slots.default?.(),
       );
@@ -121,7 +119,7 @@ export const ChatTaskItemFile = defineComponent({
         {
           ...attrs,
           class: cn(
-            'inline-flex max-w-full items-center gap-1 rounded-md border bg-secondary px-1.5 py-0.5 text-foreground text-xs',
+            'bg-secondary text-foreground inline-flex max-w-full items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs',
             props.class,
           ),
         },
@@ -169,9 +167,9 @@ export const ChatTaskTrigger = defineComponent({
                   h('div', { class: 'flex min-w-0 items-center gap-2' }, [
                     h(IconifyIcon, {
                       class: cn(
-                        'size-4 shrink-0 text-muted-foreground',
+                        'text-muted-foreground size-4 shrink-0',
                         props.status === 'active' &&
-                          'animate-spin text-primary',
+                          'text-primary animate-spin',
                         props.status === 'error' && 'text-amber-500',
                       ),
                       icon: getStatusIcon(props.status),

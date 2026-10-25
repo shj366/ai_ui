@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
+import { provide, ref } from 'vue';
+
 import { Collapsible } from '#/plugins/ai/components/ui/collapsible';
 import { cn } from '#/plugins/ai/lib/utils';
-import { provide, ref } from 'vue';
 
 interface TaskProps {
   defaultOpen?: boolean;
@@ -10,6 +12,7 @@ interface TaskProps {
 }
 
 const props = withDefaults(defineProps<TaskProps>(), {
+  class: undefined,
   defaultOpen: true,
 });
 
@@ -30,6 +33,6 @@ provide('toggle', toggleOpen);
     as-child
     v-bind="$attrs"
   >
-    <slot :is-open="isOpen" :toggle="toggleOpen" />
+    <slot :is-open="isOpen" :toggle="toggleOpen"></slot>
   </Collapsible>
 </template>

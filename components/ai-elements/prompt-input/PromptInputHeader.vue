@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { InputGroupAddon } from '#/plugins/ai/components/ui/input-group';
 import { cn } from '#/plugins/ai/lib/utils';
 
@@ -19,6 +20,6 @@ const props = defineProps<Props>();
     :class="cn('order-first flex-wrap gap-1', props.class)"
     v-bind="props"
   >
-    <slot />
+    <slot></slot>
   </InputGroupAddon>
 </template>

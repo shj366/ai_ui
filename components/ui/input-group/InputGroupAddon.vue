@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import type { InputGroupVariants } from '.';
+
 import { cn } from '#/plugins/ai/lib/utils';
+
 import { inputGroupAddonVariants } from '.';
 
 const props = withDefaults(
@@ -10,6 +13,7 @@ const props = withDefaults(
     class?: HTMLAttributes['class'];
   }>(),
   {
+    class: undefined,
     align: 'inline-start',
   },
 );
@@ -36,6 +40,6 @@ function handleInputGroupAddonClick(e: MouseEvent) {
     :class="cn(inputGroupAddonVariants({ align: props.align }), props.class)"
     @click="handleInputGroupAddonClick"
   >
-    <slot />
+    <slot></slot>
   </div>
 </template>

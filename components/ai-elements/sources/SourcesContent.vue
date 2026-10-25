@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { CollapsibleContent } from '#/plugins/ai/components/ui/collapsible';
 import { cn } from '#/plugins/ai/lib/utils';
 
@@ -18,6 +19,6 @@ const props = defineProps<{
       )
     "
   >
-    <slot />
+    <slot></slot>
   </CollapsibleContent>
 </template>

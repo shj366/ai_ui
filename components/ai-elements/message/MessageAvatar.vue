@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
+import { computed } from 'vue';
+
 import {
   Avatar,
   AvatarFallback,
   AvatarImage,
 } from '#/plugins/ai/components/ui/avatar';
-import { computed } from 'vue';
 
 interface Props {
   src: string;

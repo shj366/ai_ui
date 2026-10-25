@@ -14,7 +14,7 @@ const props = defineProps<{
     <div
       class="relative flex max-h-[22rem] items-center justify-center overflow-hidden rounded-lg bg-muted p-3"
     >
-      <slot />
+      <slot></slot>
     </div>
     <p v-if="caption" class="text-muted-foreground text-xs">
       {{ props.caption }}

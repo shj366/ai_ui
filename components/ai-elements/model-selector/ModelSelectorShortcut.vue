@@ -4,6 +4,6 @@ import { CommandShortcut } from '#/plugins/ai/components/ui/command';
 
 <template>
   <CommandShortcut v-bind="$attrs">
-    <slot />
+    <slot></slot>
   </CommandShortcut>
 </template>

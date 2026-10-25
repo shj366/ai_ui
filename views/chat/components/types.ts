@@ -107,9 +107,9 @@ export interface PromptInputFooterInfo {
 export interface PromptInputProps {
   disabled?: boolean;
   footer?:
+    | ((defaultNode: VNodeChild, info: PromptInputFooterInfo) => VNodeChild)
     | false
-    | VNodeChild
-    | ((defaultNode: VNodeChild, info: PromptInputFooterInfo) => VNodeChild);
+    | VNodeChild;
   loading?: boolean;
   onCancel?: () => void;
   onChange?: (value: string) => void;

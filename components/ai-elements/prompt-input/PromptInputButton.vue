@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
+import { Comment, computed, Text, toRef, useSlots } from 'vue';
+
 import { InputGroupButton } from '#/plugins/ai/components/ui/input-group';
 import { cn } from '#/plugins/ai/lib/utils';
-import { Comment, computed, Text, toRef, useSlots } from 'vue';
 
 type InputGroupButtonProps = InstanceType<typeof InputGroupButton>['$props'];
 
@@ -13,13 +15,15 @@ interface Props extends /* @vue-ignore */ InputGroupButtonProps {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  class: undefined,
+  size: undefined,
   variant: 'ghost',
 });
 
 const slots = useSlots();
 
 const computedSize = computed(() => {
-  if (props.size) return props.size;
+  if (props.size !== undefined && props.size !== null) return props.size;
 
   const slotNodes = slots.default?.();
 
@@ -47,6 +51,6 @@ const { size, variant: _, class: __, ...restProps } = props;
     :variant="variant"
     v-bind="restProps"
   >
-    <slot />
+    <slot></slot>
   </InputGroupButton>
 </template>

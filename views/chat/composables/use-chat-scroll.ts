@@ -458,8 +458,9 @@ export function useChatScroll(options: UseChatScrollOptions = {}) {
     };
     const handleWheel = (event: WheelEvent) => {
       markInput();
-      lastUserScrollDirection =
-        event.deltaY < 0 ? 'up' : event.deltaY > 0 ? 'down' : 'none';
+      if (event.deltaY < 0) lastUserScrollDirection = 'up';
+      else if (event.deltaY > 0) lastUserScrollDirection = 'down';
+      else lastUserScrollDirection = 'none';
     };
     const handlePointer = () => {
       markInput();
@@ -467,11 +468,13 @@ export function useChatScroll(options: UseChatScrollOptions = {}) {
     };
     const handleKeydown = (event: KeyboardEvent) => {
       markInput();
-      lastUserScrollDirection = ['ArrowUp', 'PageUp'].includes(event.key)
-        ? 'up'
-        : ['ArrowDown', 'End', 'PageDown'].includes(event.key)
-          ? 'down'
-          : 'none';
+      if (['ArrowUp', 'PageUp'].includes(event.key)) {
+        lastUserScrollDirection = 'up';
+      } else if (['ArrowDown', 'End', 'PageDown'].includes(event.key)) {
+        lastUserScrollDirection = 'down';
+      } else {
+        lastUserScrollDirection = 'none';
+      }
     };
 
     container.addEventListener('wheel', handleWheel, { passive: true });

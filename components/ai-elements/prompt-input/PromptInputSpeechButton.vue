@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
-import { MicIcon } from '@lucide/vue';
-import { cn } from '#/plugins/ai/lib/utils';
+
 import { onMounted, onUnmounted, ref } from 'vue';
+
+import { MicIcon } from '@lucide/vue';
+
+import { cn } from '#/plugins/ai/lib/utils';
+
 import { usePromptInput } from './context';
 import PromptInputButton from './PromptInputButton.vue';
 
@@ -72,7 +76,7 @@ const props = defineProps<Props>();
 
 const { textInput, setTextInput } = usePromptInput();
 const isListening = ref(false);
-const recognition = ref<SpeechRecognition | null>(null);
+const recognition = ref<null | SpeechRecognition>(null);
 
 onMounted(() => {
   const Win = window as any;
@@ -85,13 +89,22 @@ onMounted(() => {
     sr.interimResults = true;
     sr.lang = 'en-US';
 
-    sr.onstart = () => (isListening.value = true);
-    sr.onend = () => (isListening.value = false);
+    sr.addEventListener('start', () => {
+      isListening.value = true;
+    });
+    sr.addEventListener('end', () => {
+      isListening.value = false;
+    });
 
-    sr.onresult = (event: SpeechRecognitionEvent) => {
+    sr.addEventListener('result', (event: Event) => {
+      const speechEvent = event as SpeechRecognitionEvent;
       let finalTranscript = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
+      for (
+        let i = speechEvent.resultIndex;
+        i < speechEvent.results.length;
+        i++
+      ) {
+        const result = speechEvent.results[i];
         if (result?.isFinal) {
           finalTranscript += result[0]?.transcript ?? '';
         }
@@ -102,12 +115,15 @@ onMounted(() => {
           textInput.value + (textInput.value ? ' ' : '') + finalTranscript;
         setTextInput(newValue);
       }
-    };
+    });
 
-    sr.onerror = (event: SpeechRecognitionErrorEvent) => {
-      console.error('Speech recognition error:', event.error);
+    sr.addEventListener('error', (event: Event) => {
+      console.error(
+        'Speech recognition error:',
+        (event as SpeechRecognitionErrorEvent).error,
+      );
       isListening.value = false;
-    };
+    });
 
     recognition.value = sr;
   }

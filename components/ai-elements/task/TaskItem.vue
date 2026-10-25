@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 interface TaskItemProps {
@@ -11,6 +12,6 @@ const props = defineProps<TaskItemProps>();
 
 <template>
   <div :class="cn('text-sm text-muted-foreground', props.class)">
-    <slot />
+    <slot></slot>
   </div>
 </template>

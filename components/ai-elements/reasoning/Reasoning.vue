@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
+import { computed, provide, ref, watch } from 'vue';
+
 import { Collapsible } from '#/plugins/ai/components/ui/collapsible';
 import { cn } from '#/plugins/ai/lib/utils';
-import { computed, provide, ref, watch } from 'vue';
+
 import { ReasoningKey } from './context';
 
 interface Props {
@@ -15,6 +18,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  class: undefined,
   isStreaming: false,
   defaultOpen: true,
   duration: undefined,
@@ -23,8 +27,7 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  (e: 'update:modelValue', value: boolean): void;
-  (e: 'update:open', value: boolean): void;
+  (e: 'update:modelValue' | 'update:open', value: boolean): void;
   (e: 'update:duration', value: number): void;
 }>();
 
@@ -52,7 +55,7 @@ function setIsOpen(value: boolean) {
 }
 
 const hasAutoClosed = ref(false);
-const startTime = ref<number | null>(null);
+const startTime = ref<null | number>(null);
 
 const MS_IN_S = 1000;
 const AUTO_CLOSE_DELAY = 1000;
@@ -127,6 +130,6 @@ provide(ReasoningKey, {
     :class="cn('not-prose mb-4', props.class)"
     @update:open="setIsOpen"
   >
-    <slot />
+    <slot></slot>
   </Collapsible>
 </template>

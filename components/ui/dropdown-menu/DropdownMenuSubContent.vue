@@ -3,9 +3,12 @@ import type {
   DropdownMenuSubContentEmits,
   DropdownMenuSubContentProps,
 } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
 import { reactiveOmit } from '@vueuse/core';
 import { DropdownMenuSubContent, useForwardPropsEmits } from 'reka-ui';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<
@@ -29,6 +32,6 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
       )
     "
   >
-    <slot />
+    <slot></slot>
   </DropdownMenuSubContent>
 </template>

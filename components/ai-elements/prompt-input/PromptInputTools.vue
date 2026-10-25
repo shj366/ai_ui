@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<{ class?: HTMLAttributes['class'] }>();
@@ -7,6 +8,6 @@ const props = defineProps<{ class?: HTMLAttributes['class'] }>();
 
 <template>
   <div :class="cn('flex items-center gap-1', props.class)">
-    <slot />
+    <slot></slot>
   </div>
 </template>

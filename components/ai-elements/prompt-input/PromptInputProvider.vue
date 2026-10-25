@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import type { PromptInputMessage } from './types';
+
 import { getCurrentInstance } from 'vue';
+
 import { usePromptInputProvider } from './context';
 
 const props = defineProps<{
+  accept?: string;
   initialInput?: string;
   maxFiles?: number;
   maxFileSize?: number;
-  accept?: string;
 }>();
 
 const emit = defineEmits<{
@@ -17,7 +19,7 @@ const emit = defineEmits<{
 
 const instance = getCurrentInstance();
 
-function getListener(name: 'onSubmit' | 'onError') {
+function getListener(name: 'onError' | 'onSubmit') {
   return instance?.vnode.props?.[name];
 }
 
@@ -61,5 +63,5 @@ usePromptInputProvider({
 </script>
 
 <template>
-  <slot />
+  <slot></slot>
 </template>

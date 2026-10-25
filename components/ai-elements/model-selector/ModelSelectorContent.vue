@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { Command } from '#/plugins/ai/components/ui/command';
 import { DialogContent, DialogTitle } from '#/plugins/ai/components/ui/dialog';
 import { cn } from '#/plugins/ai/lib/utils';
@@ -10,6 +11,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  class: undefined,
   title: 'Model Selector',
 });
 </script>
@@ -20,7 +22,7 @@ const props = withDefaults(defineProps<Props>(), {
       {{ props.title }}
     </DialogTitle>
     <Command class="**:data-[slot=command-input-wrapper]:h-auto">
-      <slot />
+      <slot></slot>
     </Command>
   </DialogContent>
 </template>

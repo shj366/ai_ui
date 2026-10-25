@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
-import { ArrowDownIcon } from '@lucide/vue';
-import { Button } from '#/plugins/ai/components/ui/button';
-import { cn } from '#/plugins/ai/lib/utils';
+
 import { computed } from 'vue';
 import { useStickToBottomContext } from 'vue-stick-to-bottom';
+
+import { ArrowDownIcon } from '@lucide/vue';
+
+import { Button } from '#/plugins/ai/components/ui/button';
+import { cn } from '#/plugins/ai/lib/utils';
 
 interface Props {
   ariaLabel?: string;
@@ -13,6 +16,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  class: undefined,
   ariaLabel: '回到底部',
   title: '回到底部',
 });

@@ -5,11 +5,11 @@ export type AttachmentData =
   | (SourceDocumentUIPart & { id: string });
 
 export type AttachmentMediaCategory =
-  | 'image'
-  | 'video'
   | 'audio'
   | 'document'
+  | 'image'
   | 'source'
-  | 'unknown';
+  | 'unknown'
+  | 'video';
 
 export type AttachmentVariant = 'grid' | 'inline' | 'list';

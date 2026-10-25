@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { HoverCardContentProps } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
 import { reactiveOmit } from '@vueuse/core';
 import { HoverCardContent, HoverCardPortal, useForwardProps } from 'reka-ui';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 defineOptions({
@@ -12,6 +15,7 @@ defineOptions({
 const props = withDefaults(
   defineProps<HoverCardContentProps & { class?: HTMLAttributes['class'] }>(),
   {
+    class: undefined,
     sideOffset: 4,
   },
 );
@@ -33,7 +37,7 @@ const forwardedProps = useForwardProps(delegatedProps);
         )
       "
     >
-      <slot />
+      <slot></slot>
     </HoverCardContent>
   </HoverCardPortal>
 </template>

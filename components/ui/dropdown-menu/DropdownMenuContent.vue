@@ -3,13 +3,16 @@ import type {
   DropdownMenuContentEmits,
   DropdownMenuContentProps,
 } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
 import { reactiveOmit } from '@vueuse/core';
 import {
   DropdownMenuContent,
   DropdownMenuPortal,
   useForwardPropsEmits,
 } from 'reka-ui';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 defineOptions({
@@ -19,6 +22,7 @@ defineOptions({
 const props = withDefaults(
   defineProps<DropdownMenuContentProps & { class?: HTMLAttributes['class'] }>(),
   {
+    class: undefined,
     sideOffset: 4,
   },
 );
@@ -41,7 +45,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
         )
       "
     >
-      <slot />
+      <slot></slot>
     </DropdownMenuContent>
   </DropdownMenuPortal>
 </template>

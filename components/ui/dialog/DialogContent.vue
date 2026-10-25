@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { DialogContentEmits, DialogContentProps } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
 import { X } from '@lucide/vue';
 import { reactiveOmit } from '@vueuse/core';
 import {
@@ -9,7 +11,9 @@ import {
   DialogPortal,
   useForwardPropsEmits,
 } from 'reka-ui';
+
 import { cn } from '#/plugins/ai/lib/utils';
+
 import DialogOverlay from './DialogOverlay.vue';
 
 defineOptions({
@@ -24,6 +28,7 @@ const props = withDefaults(
     }
   >(),
   {
+    class: undefined,
     showCloseButton: true,
   },
 );
@@ -47,7 +52,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
         )
       "
     >
-      <slot />
+      <slot></slot>
 
       <DialogClose
         v-if="showCloseButton"

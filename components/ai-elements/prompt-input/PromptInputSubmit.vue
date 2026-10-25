@@ -1,16 +1,20 @@
 <script setup lang="ts">
 // import type { InputGroupButtonVariants } from '#/plugins/ai/components/ui/input-group'
 import type { ChatStatus } from 'ai';
+
 import type { HTMLAttributes } from 'vue';
+
+import { computed } from 'vue';
+
 import {
   CornerDownLeftIcon,
   Loader2Icon,
   SquareIcon,
   XIcon,
 } from '@lucide/vue';
+
 import { InputGroupButton } from '#/plugins/ai/components/ui/input-group';
 import { cn } from '#/plugins/ai/lib/utils';
-import { computed } from 'vue';
 
 type InputGroupButtonProps = InstanceType<typeof InputGroupButton>['$props'];
 
@@ -22,6 +26,8 @@ interface Props extends /* @vue-ignore */ InputGroupButtonProps {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  class: undefined,
+  status: undefined,
   variant: 'default',
   size: 'icon-sm',
 });

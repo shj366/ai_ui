@@ -1,8 +1,12 @@
 <script setup lang="ts">
 import type { BundledLanguage, ThemedToken } from 'shiki';
+
 import type { TokenizedCode } from './utils';
-import { cn } from '#/plugins/ai/lib/utils';
+
 import { computed, ref, watch } from 'vue';
+
+import { cn } from '#/plugins/ai/lib/utils';
+
 import {
   createRawTokens,
   highlightCode,

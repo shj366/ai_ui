@@ -1,9 +1,13 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
+import { computed } from 'vue';
+
 import { BrainIcon, ChevronDownIcon } from '@lucide/vue';
+
 import { CollapsibleTrigger } from '#/plugins/ai/components/ui/collapsible';
 import { cn } from '#/plugins/ai/lib/utils';
-import { computed } from 'vue';
+
 import { Shimmer } from '../shimmer';
 import { useReasoningContext } from './context';
 

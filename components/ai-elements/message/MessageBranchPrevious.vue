@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { ChevronLeftIcon } from '@lucide/vue';
+
 import { Button } from '#/plugins/ai/components/ui/button';
+
 import { useMessageBranchContext } from './context';
 
 const { goToPrevious, totalBranches } = useMessageBranchContext();

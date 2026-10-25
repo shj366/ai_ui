@@ -1,4 +1,5 @@
 import type { BundledLanguage } from 'shiki';
+
 import type { Component, PropType } from 'vue';
 
 import type { ChatMessageItem } from '../../../runtime/message';

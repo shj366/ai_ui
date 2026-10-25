@@ -1,4 +1,5 @@
 import type { ComputedRef, InjectionKey } from 'vue';
+
 import { inject } from 'vue';
 
 export interface CodeBlockContext {

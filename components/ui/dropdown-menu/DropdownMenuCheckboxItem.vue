@@ -3,7 +3,9 @@ import type {
   DropdownMenuCheckboxItemEmits,
   DropdownMenuCheckboxItemProps,
 } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
 import { Check } from '@lucide/vue';
 import { reactiveOmit } from '@vueuse/core';
 import {
@@ -11,6 +13,7 @@ import {
   DropdownMenuItemIndicator,
   useForwardPropsEmits,
 } from 'reka-ui';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<
@@ -43,6 +46,6 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
         </slot>
       </DropdownMenuItemIndicator>
     </span>
-    <slot />
+    <slot></slot>
   </DropdownMenuCheckboxItem>
 </template>

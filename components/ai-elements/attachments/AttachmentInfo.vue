@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
-import { cn } from '#/plugins/ai/lib/utils';
+
 import { computed } from 'vue';
+
+import { cn } from '#/plugins/ai/lib/utils';
+
 import { useAttachmentContext } from './context';
 import { getAttachmentLabel } from './utils';
 
@@ -11,6 +14,7 @@ interface Props extends /* @vue-ignore */ HTMLAttributes {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  class: undefined,
   showMediaType: false,
 });
 

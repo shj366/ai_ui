@@ -10,6 +10,6 @@ const props = defineProps<Props>();
 
 <template>
   <Select v-bind="{ ...props, ...$attrs }">
-    <slot />
+    <slot></slot>
   </Select>
 </template>

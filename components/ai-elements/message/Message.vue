@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import type { UIMessage } from 'ai';
+
 import type { HTMLAttributes } from 'vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 interface Props {
@@ -22,6 +24,6 @@ const props = defineProps<Props>();
     "
     v-bind="$attrs"
   >
-    <slot />
+    <slot></slot>
   </div>
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  class: undefined,
   title: 'No messages yet',
   description: 'Start a conversation to see messages here',
 });
@@ -26,7 +28,7 @@ const props = withDefaults(defineProps<Props>(), {
   >
     <slot>
       <div v-if="$slots.icon" class="text-muted-foreground">
-        <slot name="icon" />
+        <slot name="icon"></slot>
       </div>
 
       <div class="space-y-1">

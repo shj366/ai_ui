@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { PlusIcon } from '@lucide/vue';
+
 import { DropdownMenuTrigger } from '#/plugins/ai/components/ui/dropdown-menu';
+
 import PromptInputButton from './PromptInputButton.vue';
 
 type DropdownMenuTriggerProps = InstanceType<

@@ -2,11 +2,11 @@ import type {
   AIChatEventMessageBlock,
   AIChatMessageBlock,
 } from '../types/message';
+import type { ChatMessageItem } from './message';
 
 import { describe, expect, it } from 'vitest';
 
 import {
-  type ChatMessageItem,
   getBlocksByType,
   getMessageTextContent,
   mergeAdjacentAssistantMessagesInOrder,
@@ -38,6 +38,11 @@ function assistantMessage(
   };
 }
 
+function requireMessage(message: ChatMessageItem | undefined): ChatMessageItem {
+  if (!message) throw new Error('Expected a merged message');
+  return message;
+}
+
 function eventBlock(eventKey: string): AIChatEventMessageBlock {
   return {
     event_key: eventKey,
@@ -49,7 +54,7 @@ function eventBlock(eventKey: string): AIChatEventMessageBlock {
   };
 }
 
-describe('AI chat message merging', () => {
+describe('aI chat message merging', () => {
   it('keeps multiple reasoning runs in one assistant turn renderable', () => {
     const merged = mergeAdjacentAssistantMessagesInOrder([
       assistantMessage(
@@ -91,7 +96,7 @@ describe('AI chat message merging', () => {
     ]);
 
     expect(merged).toHaveLength(1);
-    const visibleMessage = merged[0]!;
+    const visibleMessage = requireMessage(merged[0]);
     expect(getBlocksByType(visibleMessage, 'reasoning')).toHaveLength(3);
     expect(getBlocksByType(visibleMessage, 'event')).toHaveLength(4);
     expect(getMessageTextContent(visibleMessage, 'text')).toBe(
@@ -117,10 +122,10 @@ describe('AI chat message merging', () => {
     ]);
 
     expect(merged).toHaveLength(2);
-    expect(getMessageTextContent(merged[0]!, 'reasoning')).toBe(
+    expect(getMessageTextContent(requireMessage(merged[0]), 'reasoning')).toBe(
       'first message reasoning',
     );
-    expect(getMessageTextContent(merged[1]!, 'text')).toBe(
+    expect(getMessageTextContent(requireMessage(merged[1]), 'text')).toBe(
       'Second assistant response.',
     );
   });
@@ -140,10 +145,10 @@ describe('AI chat message merging', () => {
     ]);
 
     expect(merged).toHaveLength(1);
-    expect(getMessageTextContent(merged[0]!, 'reasoning')).toBe(
+    expect(getMessageTextContent(requireMessage(merged[0]), 'reasoning')).toBe(
       'reasoning without persisted id',
     );
-    expect(getMessageTextContent(merged[0]!, 'text')).toBe(
+    expect(getMessageTextContent(requireMessage(merged[0]), 'text')).toBe(
       'Final answer without persisted id.',
     );
   });
@@ -165,12 +170,10 @@ describe('AI chat message merging', () => {
     ]);
 
     expect(merged).toHaveLength(1);
-    expect(merged[0]!.blocks.map((block) => block.type)).toEqual([
-      'text',
-      'event',
-      'text',
-    ]);
-    expect(getMessageTextContent(merged[0]!)).toBe(
+    expect(requireMessage(merged[0]).blocks.map((block) => block.type)).toEqual(
+      ['text', 'event', 'text'],
+    );
+    expect(getMessageTextContent(requireMessage(merged[0]))).toBe(
       ['I will check that now.', 'The result is ready.'].join('\n\n'),
     );
   });

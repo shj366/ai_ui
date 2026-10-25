@@ -1,19 +1,22 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
 import type { ScrollToBottomOptions } from 'vue-stick-to-bottom';
-import { cn } from '#/plugins/ai/lib/utils';
-import { reactiveOmit } from '@vueuse/core';
+
 import { onBeforeUnmount, ref, watch } from 'vue';
 import { StickToBottom } from 'vue-stick-to-bottom';
+
+import { reactiveOmit } from '@vueuse/core';
+
+import { cn } from '#/plugins/ai/lib/utils';
 
 interface Props {
   ariaLabel?: string;
   class?: HTMLAttributes['class'];
   initial?:
-    | boolean
     | 'instant'
-    | { damping?: number; stiffness?: number; mass?: number };
-  resize?: 'instant' | { damping?: number; stiffness?: number; mass?: number };
+    | boolean
+    | { damping?: number; mass?: number; stiffness?: number };
+  resize?: 'instant' | { damping?: number; mass?: number; stiffness?: number };
   damping?: number;
   stiffness?: number;
   mass?: number;
@@ -22,7 +25,9 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   ariaLabel: 'Conversation',
+  class: undefined,
   initial: true,
+  resize: undefined,
   damping: 0.7,
   stiffness: 0.05,
   mass: 1.25,
@@ -98,31 +103,31 @@ defineExpose({
     "
     role="log"
   >
-    <slot />
+    <slot></slot>
     <template #overlay="slotProps">
-      <slot name="overlay" v-bind="slotProps" />
+      <slot name="overlay" v-bind="slotProps"></slot>
     </template>
     <template #after="slotProps">
-      <slot name="after" v-bind="slotProps" />
+      <slot name="after" v-bind="slotProps"></slot>
     </template>
   </StickToBottom>
 </template>
 
 <style>
 .ai-conversation-scroll-area {
-  scrollbar-color: transparent transparent;
   scrollbar-gutter: auto !important;
+  scrollbar-color: transparent transparent;
   scrollbar-width: thin;
 }
 
 .ai-conversation-scroll:hover .ai-conversation-scroll-area,
 .ai-conversation-scroll:focus-within .ai-conversation-scroll-area {
-  scrollbar-color: hsl(var(--border) / 0.7) transparent;
+  scrollbar-color: hsl(var(--border) / 70%) transparent;
 }
 
 .ai-conversation-scroll-area::-webkit-scrollbar {
-  height: 8px;
   width: 8px;
+  height: 8px;
 }
 
 .ai-conversation-scroll-area::-webkit-scrollbar-track {
@@ -130,8 +135,8 @@ defineExpose({
 }
 
 .ai-conversation-scroll-area::-webkit-scrollbar-thumb {
-  background-clip: content-box;
   background-color: transparent;
+  background-clip: content-box;
   border: 2px solid transparent;
   border-radius: 999px;
 }
@@ -140,10 +145,10 @@ defineExpose({
   .ai-conversation-scroll-area::-webkit-scrollbar-thumb,
 .ai-conversation-scroll:focus-within
   .ai-conversation-scroll-area::-webkit-scrollbar-thumb {
-  background-color: hsl(var(--border) / 0.75);
+  background-color: hsl(var(--border) / 75%);
 }
 
 .ai-conversation-scroll-area::-webkit-scrollbar-thumb:hover {
-  background-color: hsl(var(--muted-foreground) / 0.45);
+  background-color: hsl(var(--muted-foreground) / 45%);
 }
 </style>

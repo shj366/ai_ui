@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
-import { cn } from '#/plugins/ai/lib/utils';
+
 import { computed, Fragment, isVNode, onMounted, useSlots, watch } from 'vue';
+
+import { cn } from '#/plugins/ai/lib/utils';
+
 import { useMessageBranchContext } from './context';
 
 interface Props {
@@ -23,7 +26,7 @@ const branchVNodes = computed(() => {
     return [node];
   };
 
-  const allNodes = nodes.flatMap(extractChildren);
+  const allNodes = nodes.flatMap((node) => extractChildren(node));
 
   return allNodes.filter((node) => {
     if (!isVNode(node)) return false;

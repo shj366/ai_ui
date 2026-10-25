@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 interface TaskItemFileProps {
@@ -18,6 +19,6 @@ const props = defineProps<TaskItemFileProps>();
       )
     "
   >
-    <slot />
+    <slot></slot>
   </div>
 </template>

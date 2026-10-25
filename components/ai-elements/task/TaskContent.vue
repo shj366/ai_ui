@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { CollapsibleContent } from '#/plugins/ai/components/ui/collapsible';
 import { cn } from '#/plugins/ai/lib/utils';
 
@@ -21,7 +22,7 @@ const props = defineProps<TaskContentProps>();
     v-bind="$attrs"
   >
     <div class="mt-4 space-y-2 border-l-2 border-muted pl-4">
-      <slot />
+      <slot></slot>
     </div>
   </CollapsibleContent>
 </template>

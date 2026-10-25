@@ -1,16 +1,18 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { useVModel } from '@vueuse/core';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<{
   class?: HTMLAttributes['class'];
-  defaultValue?: string | number;
-  modelValue?: string | number;
+  defaultValue?: number | string;
+  modelValue?: number | string;
 }>();
 
 const emits = defineEmits<{
-  (e: 'update:modelValue', payload: string | number): void;
+  (e: 'update:modelValue', payload: number | string): void;
 }>();
 
 const modelValue = useVModel(props, 'modelValue', emits, {
@@ -29,5 +31,5 @@ const modelValue = useVModel(props, 'modelValue', emits, {
         props.class,
       )
     "
-  />
+  ></textarea>
 </template>

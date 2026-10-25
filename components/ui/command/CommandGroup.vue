@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import type { ListboxGroupProps } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
+import { computed, onMounted, onUnmounted } from 'vue';
+
 import { reactiveOmit } from '@vueuse/core';
 import { ListboxGroup, ListboxGroupLabel, useId } from 'reka-ui';
-import { computed, onMounted, onUnmounted } from 'vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
+
 import { provideCommandGroupContext, useCommand } from '.';
 
 const props = defineProps<
@@ -20,7 +25,7 @@ const { allGroups, filterState } = useCommand();
 const id = useId();
 
 const isRender = computed(() =>
-  !filterState.search ? true : filterState.filtered.groups.has(id),
+  filterState.search ? filterState.filtered.groups.has(id) : true,
 );
 
 provideCommandGroupContext({ id });
@@ -47,6 +52,6 @@ onUnmounted(() => {
     >
       {{ heading }}
     </ListboxGroupLabel>
-    <slot />
+    <slot></slot>
   </ListboxGroup>
 </template>

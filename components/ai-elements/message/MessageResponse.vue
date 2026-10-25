@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
-import { cn } from '#/plugins/ai/lib/utils';
+
 import { computed, useSlots } from 'vue';
 import { Markdown } from 'vue-stream-markdown';
 import 'vue-stream-markdown/index.css';
+
+import { cn } from '#/plugins/ai/lib/utils';
 
 interface Props {
   content?: string;

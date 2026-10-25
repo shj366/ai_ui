@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import type { ListboxRootEmits, ListboxRootProps } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
+import { reactive, ref, watch } from 'vue';
+
 import { reactiveOmit } from '@vueuse/core';
 import { ListboxRoot, useFilter, useForwardPropsEmits } from 'reka-ui';
-import { reactive, ref, watch } from 'vue';
+
 import { cn } from '#/plugins/ai/lib/utils';
+
 import { provideCommandContext } from '.';
 
 const props = withDefaults(
   defineProps<ListboxRootProps & { class?: HTMLAttributes['class'] }>(),
   {
+    class: undefined,
     modelValue: '',
   },
 );
@@ -57,7 +63,7 @@ function filterItems() {
   // Check which groups have at least 1 item shown
   for (const [groupId, group] of allGroups.value) {
     for (const itemId of group) {
-      if (filterState.filtered.items.get(itemId)! > 0) {
+      if ((filterState.filtered.items.get(itemId) ?? 0) > 0) {
         filterState.filtered.groups.add(groupId);
         break;
       }
@@ -92,6 +98,6 @@ provideCommandContext({
       )
     "
   >
-    <slot />
+    <slot></slot>
   </ListboxRoot>
 </template>

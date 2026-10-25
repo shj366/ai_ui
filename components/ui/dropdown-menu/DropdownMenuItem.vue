@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { DropdownMenuItemProps } from 'reka-ui';
+
 import type { HTMLAttributes } from 'vue';
+
 import { reactiveOmit } from '@vueuse/core';
 import { DropdownMenuItem, useForwardProps } from 'reka-ui';
+
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = withDefaults(
@@ -14,6 +17,7 @@ const props = withDefaults(
     }
   >(),
   {
+    class: undefined,
     variant: 'default',
   },
 );
@@ -36,6 +40,6 @@ const forwardedProps = useForwardProps(delegatedProps);
       )
     "
   >
-    <slot />
+    <slot></slot>
   </DropdownMenuItem>
 </template>

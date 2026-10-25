@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import type { CSSProperties, HTMLAttributes } from 'vue';
-import { cn } from '#/plugins/ai/lib/utils';
-import { motion } from 'motion-v';
+
 import { computed, useSlots } from 'vue';
+
+import { motion } from 'motion-v';
+
+import { cn } from '#/plugins/ai/lib/utils';
 
 export interface TextShimmerProps {
   as?: keyof HTMLElementTagNameMap;
@@ -12,6 +15,7 @@ export interface TextShimmerProps {
 }
 
 const props = withDefaults(defineProps<TextShimmerProps>(), {
+  class: undefined,
   as: 'p',
   duration: 2,
   spread: 2,
@@ -39,8 +43,8 @@ const dynamicSpread = computed(() => {
 
 const componentClasses = computed(() =>
   cn(
-    'relative inline-block bg-[length:250%_100%,auto] bg-clip-text text-transparent',
-    '[--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--color-background),#0000_calc(50%+var(--spread)))] [background-repeat:no-repeat,padding-box]',
+    'relative inline-block bg-size-[250%_100%,auto] bg-clip-text text-transparent',
+    '[background-repeat:no-repeat,padding-box] [--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--color-background),#0000_calc(50%+var(--spread)))]',
     props.class,
   ),
 );
@@ -71,6 +75,6 @@ const MotionComponent = computed(() => {
       ease: 'linear',
     }"
   >
-    <slot />
+    <slot></slot>
   </component>
 </template>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { DropdownMenuItem } from '#/plugins/ai/components/ui/dropdown-menu';
 import { cn } from '#/plugins/ai/lib/utils';
 
@@ -16,6 +17,6 @@ const props = defineProps<Props>();
 
 <template>
   <DropdownMenuItem :class="cn(props.class)">
-    <slot />
+    <slot></slot>
   </DropdownMenuItem>
 </template>

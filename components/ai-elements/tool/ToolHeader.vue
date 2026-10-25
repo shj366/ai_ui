@@ -1,22 +1,27 @@
 <script setup lang="ts">
 import type { DynamicToolUIPart, ToolUIPart } from 'ai';
+
 import type { HTMLAttributes } from 'vue';
+
+import { computed } from 'vue';
+
 import { ChevronDownIcon, WrenchIcon } from '@lucide/vue';
+
 import { CollapsibleTrigger } from '#/plugins/ai/components/ui/collapsible';
 import { cn } from '#/plugins/ai/lib/utils';
-import { computed } from 'vue';
+
 import StatusBadge from './ToolStatusBadge.vue';
 
 type ToolHeaderProps = {
-  title?: string;
   class?: HTMLAttributes['class'];
+  title?: string;
 } & (
-  | { type: ToolUIPart['type']; state: ToolUIPart['state']; toolName?: never }
   | {
-      type: DynamicToolUIPart['type'];
       state: DynamicToolUIPart['state'];
       toolName: string;
+      type: DynamicToolUIPart['type'];
     }
+  | { state: ToolUIPart['state']; toolName?: never; type: ToolUIPart['type'] }
 );
 
 const props = defineProps<ToolHeaderProps>();

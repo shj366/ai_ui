@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import type { PromptInputFooterInfo } from './types';
 import type { VNodeChild } from 'vue';
+
+import type { PromptInputFooterInfo } from './types';
 
 import { computed, defineComponent, h, watch } from 'vue';
 
@@ -25,15 +26,16 @@ import {
   PromptInputTools,
   usePromptInput,
 } from '#/plugins/ai/components/ai-elements';
+
 import { VNodeRenderer } from './vnode-renderer';
 
 const props = defineProps<{
   disabled?: boolean;
   expanded?: boolean;
   footer?:
+    | ((defaultNode: VNodeChild, info: PromptInputFooterInfo) => VNodeChild)
     | false
-    | VNodeChild
-    | ((defaultNode: VNodeChild, info: PromptInputFooterInfo) => VNodeChild);
+    | VNodeChild;
   loading?: boolean;
   name?: string;
   onCancel?: () => void;
@@ -53,8 +55,7 @@ const textareaClass = computed(() =>
 
 watch(
   () => props.value,
-  (value) => {
-    const nextValue = value ?? '';
+  (nextValue = '') => {
     if (context.textInput.value !== nextValue) {
       context.setTextInput(nextValue);
     }

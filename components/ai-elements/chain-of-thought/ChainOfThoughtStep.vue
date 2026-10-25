@@ -11,6 +11,7 @@ const props = withDefaults(
     status?: 'active' | 'complete' | 'pending';
   }>(),
   {
+    class: undefined,
     description: undefined,
     status: 'complete',
   },
@@ -36,15 +37,15 @@ const statusStyles = {
     v-bind="$attrs"
   >
     <div class="relative mt-0.5">
-      <slot name="icon" />
-      <div class="-mx-px absolute top-7 bottom-0 left-1/2 w-px bg-border" />
+      <slot name="icon"></slot>
+      <div class="-mx-px absolute top-7 bottom-0 left-1/2 w-px bg-border"></div>
     </div>
     <div class="flex-1 space-y-2">
       <div>{{ props.label }}</div>
       <div v-if="props.description" class="text-muted-foreground text-xs">
         {{ props.description }}
       </div>
-      <slot />
+      <slot></slot>
     </div>
   </div>
 </template>

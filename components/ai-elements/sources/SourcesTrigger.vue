@@ -1,12 +1,14 @@
 <script setup lang="ts">
 import type { HTMLAttributes } from 'vue';
+
 import { ChevronDownIcon } from '@lucide/vue';
+
 import { CollapsibleTrigger } from '#/plugins/ai/components/ui/collapsible';
 import { cn } from '#/plugins/ai/lib/utils';
 
 const props = defineProps<{
-  count: number;
   class?: HTMLAttributes['class'];
+  count: number;
 }>();
 </script>
 

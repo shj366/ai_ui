@@ -9,23 +9,6 @@ export { default as AttachmentPreview } from './attachments/AttachmentPreview.vu
 export { default as AttachmentRemove } from './attachments/AttachmentRemove.vue';
 export { default as Attachments } from './attachments/Attachments.vue';
 
-export { default as CodeBlock } from './code-block/CodeBlock.vue';
-export { default as CodeBlockActions } from './code-block/CodeBlockActions.vue';
-export { default as CodeBlockContainer } from './code-block/CodeBlockContainer.vue';
-export { default as CodeBlockContent } from './code-block/CodeBlockContent.vue';
-export { default as CodeBlockCopyButton } from './code-block/CodeBlockCopyButton.vue';
-export { default as CodeBlockFilename } from './code-block/CodeBlockFilename.vue';
-export { default as CodeBlockHeader } from './code-block/CodeBlockHeader.vue';
-export { default as CodeBlockLanguageSelector } from './code-block/CodeBlockLanguageSelector.vue';
-export { default as CodeBlockLanguageSelectorContent } from './code-block/CodeBlockLanguageSelectorContent.vue';
-
-export { default as CodeBlockLanguageSelectorItem } from './code-block/CodeBlockLanguageSelectorItem.vue';
-
-export { default as CodeBlockLanguageSelectorTrigger } from './code-block/CodeBlockLanguageSelectorTrigger.vue';
-export { default as CodeBlockLanguageSelectorValue } from './code-block/CodeBlockLanguageSelectorValue.vue';
-
-export { default as CodeBlockTitle } from './code-block/CodeBlockTitle.vue';
-
 export { default as ChainOfThought } from './chain-of-thought/ChainOfThought.vue';
 export { default as ChainOfThoughtContent } from './chain-of-thought/ChainOfThoughtContent.vue';
 export { default as ChainOfThoughtHeader } from './chain-of-thought/ChainOfThoughtHeader.vue';
@@ -33,6 +16,23 @@ export { default as ChainOfThoughtImage } from './chain-of-thought/ChainOfThough
 export { default as ChainOfThoughtSearchResult } from './chain-of-thought/ChainOfThoughtSearchResult.vue';
 export { default as ChainOfThoughtSearchResults } from './chain-of-thought/ChainOfThoughtSearchResults.vue';
 export { default as ChainOfThoughtStep } from './chain-of-thought/ChainOfThoughtStep.vue';
+export { default as CodeBlock } from './code-block/CodeBlock.vue';
+export { default as CodeBlockActions } from './code-block/CodeBlockActions.vue';
+
+export { default as CodeBlockContainer } from './code-block/CodeBlockContainer.vue';
+
+export { default as CodeBlockContent } from './code-block/CodeBlockContent.vue';
+export { default as CodeBlockCopyButton } from './code-block/CodeBlockCopyButton.vue';
+
+export { default as CodeBlockFilename } from './code-block/CodeBlockFilename.vue';
+
+export { default as CodeBlockHeader } from './code-block/CodeBlockHeader.vue';
+export { default as CodeBlockLanguageSelector } from './code-block/CodeBlockLanguageSelector.vue';
+export { default as CodeBlockLanguageSelectorContent } from './code-block/CodeBlockLanguageSelectorContent.vue';
+export { default as CodeBlockLanguageSelectorItem } from './code-block/CodeBlockLanguageSelectorItem.vue';
+export { default as CodeBlockLanguageSelectorTrigger } from './code-block/CodeBlockLanguageSelectorTrigger.vue';
+export { default as CodeBlockLanguageSelectorValue } from './code-block/CodeBlockLanguageSelectorValue.vue';
+export { default as CodeBlockTitle } from './code-block/CodeBlockTitle.vue';
 export { default as Conversation } from './conversation/Conversation.vue';
 export { default as ConversationContent } from './conversation/ConversationContent.vue';
 export { default as ConversationEmptyState } from './conversation/ConversationEmptyState.vue';
