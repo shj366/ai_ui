@@ -40,6 +40,8 @@ const formOptions: VbenFormProps = {
 };
 
 const gridOptions: VxeTableGridOptions<AIQuickPhraseResult> = {
+  id: 'plugin-ai-views-quick-phrase-index-vue',
+  customConfig: { storage: true },
   rowConfig: {
     keyField: 'id',
   },
