@@ -3,7 +3,7 @@ import type { VNodeChild } from 'vue';
 
 import type { PromptInputFooterInfo } from './types';
 
-import { computed, defineComponent, h, watch } from 'vue';
+import { computed, h, watch } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 
@@ -70,7 +70,7 @@ watch(
   },
 );
 
-const AttachmentButton = defineComponent({
+const AttachmentButton = {
   name: 'ChatPromptAttachmentButton',
   setup() {
     return () =>
@@ -92,9 +92,9 @@ const AttachmentButton = defineComponent({
         ]),
       ]);
   },
-});
+};
 
-const ExpandButton = defineComponent({
+const ExpandButton = {
   name: 'ChatPromptExpandButton',
   setup() {
     return () =>
@@ -116,7 +116,7 @@ const ExpandButton = defineComponent({
           }),
       );
   },
-});
+};
 
 const defaultSubmitNode = computed<VNodeChild>(() =>
   props.loading

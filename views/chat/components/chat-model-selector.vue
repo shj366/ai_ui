@@ -29,7 +29,7 @@ const props = defineProps<{
 }>();
 
 const emit = defineEmits<{
-  (event: 'select-model', model: AIModelResult): void;
+  (event: 'selectModel', model: AIModelResult): void;
 }>();
 
 const open = ref(false);
@@ -75,7 +75,7 @@ const providerModelGroups = computed(() =>
 );
 
 function selectModel(model: AIModelResult) {
-  emit('select-model', model);
+  emit('selectModel', model);
   open.value = false;
 }
 </script>
