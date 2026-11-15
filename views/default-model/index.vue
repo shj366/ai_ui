@@ -116,10 +116,13 @@ async function fetchModelsByProvider(providerId?: number) {
 
 async function refreshPage() {
   loading.value = true;
+  const previousProviderId = selectedProviderId.value;
   try {
     await fetchProviders();
     await fetchDefaultModel();
-    await fetchModelsByProvider(selectedProviderId.value);
+    if (selectedProviderId.value === previousProviderId) {
+      await fetchModelsByProvider(selectedProviderId.value);
+    }
   } finally {
     loading.value = false;
   }
