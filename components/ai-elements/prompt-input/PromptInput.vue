@@ -145,6 +145,7 @@ function onSubmit(e: Event) {
       @dragover.prevent="handleDragOver"
       @drop.prevent.stop="handleDrop"
     >
+      <!-- 显式设置布局，避免依赖 Chromium 105 才支持的 :has() 推断子项结构。 -->
       <InputGroup class="!h-auto !flex-col !items-stretch overflow-hidden">
         <slot></slot>
       </InputGroup>

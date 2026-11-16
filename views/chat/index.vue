@@ -1224,7 +1224,7 @@ onMounted(async () => {
   hasInitialized = true;
 });
 
-// 等分栏完成首帧尺寸测量后再折叠，避免阻断页面初始化请求。
+// 仅在断点切换后调节已注册面板；延后一帧确保 Reka Splitter 完成尺寸测量。
 watch(isMobile, async (mobile) => {
   await nextTick();
   requestAnimationFrame(() => {
@@ -1268,6 +1268,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
+  <!-- 移动端 0%/100%、桌面端 20%/80%，保证分栏初始尺寸总和为 100%。 -->
   <ColPage
     ref="colPageRef"
     auto-content-height
