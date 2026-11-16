@@ -1225,20 +1225,17 @@ onMounted(async () => {
 });
 
 // 等分栏完成首帧尺寸测量后再折叠，避免阻断页面初始化请求。
-watch(
-  isMobile,
-  async (mobile) => {
-    await nextTick();
-    requestAnimationFrame(() => {
-      if (mobile) {
-        colPageRef.value?.collapseLeft();
-      } else {
-        mobileSidebarOpen.value = false;
-        colPageRef.value?.expandLeft();
-      }
-    });
-  },
-);
+watch(isMobile, async (mobile) => {
+  await nextTick();
+  requestAnimationFrame(() => {
+    if (mobile) {
+      colPageRef.value?.collapseLeft();
+    } else {
+      mobileSidebarOpen.value = false;
+      colPageRef.value?.expandLeft();
+    }
+  });
+});
 
 watch(viewportWidth, (width) => {
   if (mobileSidebarWidth.value === undefined) {
