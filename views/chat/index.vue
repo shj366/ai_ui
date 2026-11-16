@@ -1456,8 +1456,8 @@ onBeforeUnmount(() => {
   [data-slot='resizable-panel-group']
   > [data-slot='resizable-panel']:last-child {
   flex: 1 1 100% !important;
-  max-width: 100% !important;
   min-width: 0 !important;
+  max-width: 100% !important;
 }
 
 .ai-elements-markdown p {
