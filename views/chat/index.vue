@@ -1238,7 +1238,6 @@ watch(
       }
     });
   },
-  { immediate: true },
 );
 
 watch(viewportWidth, (width) => {
@@ -1280,7 +1279,7 @@ onBeforeUnmount(() => {
         ? 'ai-chat-mobile-content !h-full !min-h-0 !overflow-hidden !p-0'
         : undefined
     "
-    :left-width="20"
+    :left-width="isMobile ? 0 : 20"
     :left-collapsed-width="0"
     :left-collapsible="isMobile"
     :left-min-width="isMobile ? 0 : undefined"
