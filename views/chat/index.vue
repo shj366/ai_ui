@@ -1217,9 +1217,6 @@ const [RenameConversationModal, renameConversationModalApi] = useVbenModal({
 });
 
 onMounted(async () => {
-  if (isMobile.value) {
-    colPageRef.value?.collapseLeft();
-  }
   await refreshChatResources();
   await fetchQuickPhrasesFromToolbar();
   await initializeSession();
@@ -1227,15 +1224,22 @@ onMounted(async () => {
   hasInitialized = true;
 });
 
-watch(isMobile, async (mobile) => {
-  await nextTick();
-  if (mobile) {
-    colPageRef.value?.collapseLeft();
-  } else {
-    mobileSidebarOpen.value = false;
-    colPageRef.value?.expandLeft();
-  }
-});
+// 等分栏完成首帧尺寸测量后再折叠，避免阻断页面初始化请求。
+watch(
+  isMobile,
+  async (mobile) => {
+    await nextTick();
+    requestAnimationFrame(() => {
+      if (mobile) {
+        colPageRef.value?.collapseLeft();
+      } else {
+        mobileSidebarOpen.value = false;
+        colPageRef.value?.expandLeft();
+      }
+    });
+  },
+  { immediate: true },
+);
 
 watch(viewportWidth, (width) => {
   if (mobileSidebarWidth.value === undefined) {
