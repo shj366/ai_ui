@@ -23,6 +23,7 @@ const props = defineProps<{
   loading: boolean;
   loadingMore: boolean;
   menu: ConversationSidebarMenu;
+  mobile?: boolean;
   onActiveChange: (key: string) => void;
   onLoadMore: () => void;
 }>();
@@ -65,8 +66,12 @@ function selectItem(item: ConversationSidebarItem) {
 </script>
 
 <template>
+  <!-- FLZK 移动端适配：抽屉内侧栏铺满内容区，不显示卡片边框。 -->
   <aside
-    class="flex h-full min-h-0 flex-col overflow-hidden rounded-[var(--radius)] border border-border bg-card"
+    :class="[
+      'flex h-full min-h-0 flex-col overflow-hidden rounded-[var(--radius)] border border-border bg-card',
+      mobile && '!rounded-none !border-0',
+    ]"
   >
     <div class="border-b border-border p-3">
       <a-button

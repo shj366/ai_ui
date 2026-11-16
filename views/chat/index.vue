@@ -25,6 +25,7 @@ import type { VbenFormSchema } from '#/adapter/form';
 
 import {
   computed,
+  nextTick,
   onActivated,
   onBeforeUnmount,
   onMounted,
@@ -36,6 +37,7 @@ import { ColPage, confirm, useVbenModal } from '@vben/common-ui';
 import { IconifyIcon } from '@vben/icons';
 import { usePreferences } from '@vben/preferences';
 
+import { useMediaQuery, useWindowSize } from '@vueuse/core';
 import { message } from 'antdv-next';
 
 import { useVbenForm } from '#/adapter/form';
@@ -78,6 +80,18 @@ import { usePromptToolbar } from './composables/use-prompt-toolbar';
 import { normalizeAIModelOptions } from './model-options';
 
 const { isDark } = usePreferences();
+// FLZK 移动端适配：折叠桌面侧栏，并按视口宽度控制可调抽屉尺寸。
+const isMobile = useMediaQuery('(max-width: 767px)');
+const { width: viewportWidth } = useWindowSize();
+const defaultMobileSidebarWidth = computed(() =>
+  Math.min(320, Math.max(240, Math.round(viewportWidth.value * 0.82))),
+);
+const mobileSidebarWidth = ref<number>();
+const mobileSidebarOpen = ref(false);
+const colPageRef = ref<{
+  collapseLeft: () => void;
+  expandLeft: () => void;
+}>();
 const prompt = ref('');
 const promptDrafts = ref<Record<string, string>>({});
 const draftConversationTitle = ref('新话题');
@@ -1095,6 +1109,23 @@ function handleConversationActiveChange(value: number | string) {
   void selectConversation(String(value));
 }
 
+// FLZK 移动端适配：选中或新建会话后关闭抽屉，调整宽度时限制在可视范围内。
+function handleMobileConversationActiveChange(value: number | string) {
+  mobileSidebarOpen.value = false;
+  handleConversationActiveChange(value);
+}
+
+function handleMobileCreateConversation() {
+  mobileSidebarOpen.value = false;
+  createNewConversation();
+}
+
+function handleMobileSidebarResize(size: number) {
+  const maxWidth = Math.min(420, viewportWidth.value * 0.9);
+  const minWidth = Math.min(220, maxWidth);
+  mobileSidebarWidth.value = Math.max(minWidth, Math.min(size, maxWidth));
+}
+
 function handlePromptInputSubmit(
   messageText: string,
   _slotConfig?: unknown,
@@ -1186,11 +1217,32 @@ const [RenameConversationModal, renameConversationModalApi] = useVbenModal({
 });
 
 onMounted(async () => {
+  if (isMobile.value) {
+    colPageRef.value?.collapseLeft();
+  }
   await refreshChatResources();
   await fetchQuickPhrasesFromToolbar();
   await initializeSession();
 
   hasInitialized = true;
+});
+
+watch(isMobile, async (mobile) => {
+  await nextTick();
+  if (mobile) {
+    colPageRef.value?.collapseLeft();
+  } else {
+    mobileSidebarOpen.value = false;
+    colPageRef.value?.expandLeft();
+  }
+});
+
+watch(viewportWidth, (width) => {
+  if (mobileSidebarWidth.value === undefined) {
+    return;
+  }
+  const maxWidth = Math.min(420, width * 0.9);
+  mobileSidebarWidth.value = Math.min(mobileSidebarWidth.value, maxWidth);
 });
 
 onActivated(async () => {
@@ -1216,9 +1268,24 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <ColPage auto-content-height :left-width="20" :right-width="80">
+  <ColPage
+    ref="colPageRef"
+    auto-content-height
+    :content-class="
+      isMobile
+        ? 'ai-chat-mobile-content !h-full !min-h-0 !overflow-hidden !p-0'
+        : undefined
+    "
+    :left-width="20"
+    :left-collapsed-width="0"
+    :left-collapsible="isMobile"
+    :left-min-width="isMobile ? 0 : undefined"
+    :resizable="!isMobile"
+    :right-width="80"
+  >
     <template #left>
       <ChatSidebar
+        v-if="!isMobile"
         :active-key="activeConversationId"
         :creation="conversationCreation"
         :has-more="hasMoreConversations"
@@ -1233,22 +1300,39 @@ onBeforeUnmount(() => {
 
     <a-card
       :classes="{
-        root: 'flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius)] bg-card',
-        header: 'shrink-0 !border-b !border-border md:!px-6',
+        root: isMobile
+          ? '!-ml-2 !flex !h-full !w-[calc(100%+0.5rem)] !min-h-0 !min-w-0 !flex-col !overflow-hidden !rounded-none !border-0 !bg-card'
+          : 'flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-[var(--radius)] bg-card',
+        header: isMobile
+          ? 'shrink-0 !border-b !border-border !px-2 !py-1'
+          : 'shrink-0 !border-b !border-border md:!px-6',
         body: 'flex min-h-0 flex-1 flex-col !p-0',
       }"
       variant="outlined"
     >
       <template #title>
-        <div class="flex min-w-0 flex-wrap items-center gap-2">
+        <div class="flex min-w-0 items-center gap-2">
+          <a-button
+            v-if="isMobile"
+            aria-label="打开会话列表"
+            class="shrink-0"
+            shape="circle"
+            title="打开会话列表"
+            type="text"
+            @click="mobileSidebarOpen = true"
+          >
+            <template #icon>
+              <IconifyIcon class="size-5" icon="mdi:menu" />
+            </template>
+          </a-button>
           <div
-            class="min-w-0 max-w-[min(420px,48vw)] truncate text-[13px] font-semibold leading-7 text-foreground"
+            class="min-w-0 flex-1 truncate text-[13px] font-semibold leading-7 text-foreground md:flex-none md:max-w-[min(420px,48vw)]"
             :title="activeConversationTitle"
           >
             {{ activeConversationTitle }}
           </div>
           <ChatModelSelector
-            class="shrink-0"
+            class="max-w-[45%] shrink-0 md:max-w-none"
             :disabled="sending || resourcesLoading"
             :loading="resourcesLoading"
             :models="enabledModels"
@@ -1324,6 +1408,34 @@ onBeforeUnmount(() => {
       />
     </a-card>
 
+    <!-- FLZK 移动端适配：抽屉承载会话列表，宽度支持拖动调整。 -->
+    <a-drawer
+      v-model:open="mobileSidebarOpen"
+      :classes="{ body: '!overflow-hidden !p-0' }"
+      placement="left"
+      :resizable="{ onResize: handleMobileSidebarResize }"
+      :size="mobileSidebarWidth ?? defaultMobileSidebarWidth"
+      title="会话列表"
+    >
+      <div class="h-full min-h-0">
+        <ChatSidebar
+          :active-key="activeConversationId"
+          :creation="{
+            ...conversationCreation,
+            onClick: handleMobileCreateConversation,
+          }"
+          :has-more="hasMoreConversations"
+          :items="conversationItems || []"
+          :loading="sidebarLoading"
+          :loading-more="sidebarMoreLoading"
+          mobile
+          :menu="conversationListMenu"
+          :on-active-change="handleMobileConversationActiveChange"
+          :on-load-more="loadMoreConversations"
+        />
+      </div>
+    </a-drawer>
+
     <RenameConversationModal>
       <RenameConversationForm />
     </RenameConversationModal>
@@ -1331,6 +1443,19 @@ onBeforeUnmount(() => {
 </template>
 
 <style>
+/* FLZK 移动端适配：隐藏折叠面板并让聊天区铺满，避免分栏留白溢出。 */
+.ai-chat-mobile-content [data-slot='resizable-panel']:first-child {
+  display: none !important;
+}
+
+.ai-chat-mobile-content
+  [data-slot='resizable-panel-group']
+  > [data-slot='resizable-panel']:last-child {
+  flex: 1 1 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+}
+
 .ai-elements-markdown p {
   margin: 0;
 }
