@@ -1281,7 +1281,7 @@ onBeforeUnmount(() => {
     :left-collapsible="isMobile"
     :left-min-width="isMobile ? 0 : undefined"
     :resizable="!isMobile"
-    :right-width="80"
+    :right-width="isMobile ? 100 : 80"
   >
     <template #left>
       <ChatSidebar
