@@ -203,6 +203,8 @@ onActivated(async () => {
                 :disabled="saving || !selectedProviderId"
                 :loading="modelsLoading"
                 :options="modelOptions"
+                show-search
+                option-filter-prop="label"
                 placeholder="请选择模型"
               />
             </div>

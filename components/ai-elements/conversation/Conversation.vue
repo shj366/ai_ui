@@ -12,10 +12,7 @@ import { cn } from '#/plugins/ai/lib/utils';
 interface Props {
   ariaLabel?: string;
   class?: HTMLAttributes['class'];
-  initial?:
-    | 'instant'
-    | boolean
-    | { damping?: number; mass?: number; stiffness?: number };
+  initial?: boolean | { damping?: number; mass?: number; stiffness?: number };
   resize?: 'instant' | { damping?: number; mass?: number; stiffness?: number };
   damping?: number;
   stiffness?: number;

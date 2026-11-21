@@ -410,7 +410,7 @@ defineExpose({
   <Conversation
     ref="conversationRef"
     :class="conversationClass"
-    :initial="props.autoScroll ? 'instant' : false"
+    :initial="props.autoScroll"
     @scroll="handleScroll"
   >
     <ConversationContent :class="contentClass">
