@@ -26,7 +26,7 @@ const routes: RouteRecordRaw[] = [
     path: '/plugins/ai/model-service',
     component: () => import('../views/model-service/index.vue'),
     meta: {
-      title: $t('ai.model'),
+      title: $t('ai.model-service'),
       icon: 'carbon:model-alt',
     },
   },
@@ -35,7 +35,7 @@ const routes: RouteRecordRaw[] = [
     path: '/plugins/ai/default-model',
     component: () => import('../views/default-model/index.vue'),
     meta: {
-      title: $t('ai.default_model'),
+      title: $t('ai.default-model'),
       icon: 'carbon:model-alt',
     },
   },
@@ -44,7 +44,7 @@ const routes: RouteRecordRaw[] = [
     path: '/plugins/ai/quick-phrase',
     component: () => import('../views/quick-phrase/index.vue'),
     meta: {
-      title: $t('ai.quick_phrase'),
+      title: $t('ai.quick-phrase'),
       icon: 'mdi:lightning-bolt-outline',
     },
   },

@@ -1,11 +1,8 @@
 {
   "menu": "AI",
   "chat": "AI Chat",
-  "default_model": "Default Model",
   "default-model": "Default Model",
   "provider": "Provider",
-  "model": "Providers & Models",
   "model-service": "Providers & Models",
-  "quick_phrase": "Quick Phrase",
   "quick-phrase": "Quick Phrase"
 }
