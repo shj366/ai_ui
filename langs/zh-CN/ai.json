@@ -2,7 +2,10 @@
   "menu": "AI",
   "chat": "AI Chat",
   "default_model": "默认模型",
+  "default-model": "默认模型",
   "provider": "供应商管理",
   "model": "供应商与模型",
-  "quick_phrase": "快捷短语"
+  "model-service": "供应商与模型",
+  "quick_phrase": "快捷短语",
+  "quick-phrase": "快捷短语"
 }
